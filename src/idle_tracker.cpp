@@ -1,9 +1,6 @@
 #include <Geode/modify/CCDirector.hpp>
 #include <Geode/modify/CCKeyboardDispatcher.hpp>
 #include <Geode/modify/CCTouchDispatcher.hpp>
-#if defined(GEODE_IS_WINDOWS)
-#include <Geode/modify/CCEGLView.hpp>
-#endif
 #include <Geode/cocos/CCScheduler.h>
 #include <array>
 
@@ -32,7 +29,8 @@ void checkIdleThresholds() {
         if (idleSeconds < kIdleThresholdSeconds[i]) continue;
 
         auto idleDuration = formatDuration(kIdleThresholdSeconds[i]);
-        sendWebhookDirect(
+        sendWebhook(
+            "notify-idle",
             kIdleThresholdTitles[i],
             fmt::format("{} has been idle for {}.", playerName, idleDuration),
             embed_color::kIdle
@@ -77,26 +75,3 @@ class $modify(MyCCTouchDispatcher, cocos2d::CCTouchDispatcher) {
         cocos2d::CCTouchDispatcher::touches(touches, event, index);
     }
 };
-
-#if defined(GEODE_IS_WINDOWS)
-class $modify(MyCCEGLView, cocos2d::CCEGLView) {
-    void onGLFWMouseCallBack(GLFWwindow* w, int button, int action, int mods) {
-        if (action == 1) {
-            markActivity();
-        }
-        cocos2d::CCEGLView::onGLFWMouseCallBack(w, button, action, mods);
-    }
-
-    void onGLFWMouseScrollCallback(GLFWwindow* w, double xOffset, double yOffset) {
-        markActivity();
-        cocos2d::CCEGLView::onGLFWMouseScrollCallback(w, xOffset, yOffset);
-    }
-
-    void onGLFWCharCallback(GLFWwindow* w, unsigned int entered) {
-        if (entered != 0) {
-            markActivity();
-        }
-        cocos2d::CCEGLView::onGLFWCharCallback(w, entered);
-    }
-};
-#endif

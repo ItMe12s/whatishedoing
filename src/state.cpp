@@ -12,12 +12,12 @@ Clock::time_point g_lastActivityTime = Clock::now();
 uint8_t g_idleThresholdMask = 0;
 } // namespace
 
-int LevelSession::elapsedSeconds() const {
+int64_t LevelSession::elapsedMilliseconds() const {
     auto total = accumulated;
     if (active) {
-        total += std::chrono::duration_cast<Seconds>(Clock::now() - attemptStart);
+        total += std::chrono::duration_cast<Milliseconds>(Clock::now() - attemptStart);
     }
-    return static_cast<int>(total.count());
+    return total.count();
 }
 
 std::string LevelSession::settingKey() const {
@@ -45,7 +45,7 @@ int LevelSession::color() const {
 }
 
 void LevelSession::reset() {
-    accumulated = Seconds::zero();
+    accumulated = Milliseconds::zero();
     levelID = 0;
     levelName.clear();
     creatorName.clear();
@@ -100,6 +100,6 @@ std::string displayCreatorName(std::string const& creatorName) {
 
 int secondsSince(Clock::time_point const& start) {
     return static_cast<int>(
-        std::chrono::duration_cast<Seconds>(Clock::now() - start).count()
+        std::chrono::duration_cast<std::chrono::seconds>(Clock::now() - start).count()
     );
 }

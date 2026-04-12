@@ -1,6 +1,7 @@
 #pragma once
 
 #include <Geode/Geode.hpp>
+#include <cstdint>
 #include <string>
 #include <vector>
 
@@ -11,6 +12,7 @@ struct WebhookField {
 };
 
 std::string formatDuration(int totalSeconds);
+std::string formatDurationMs(int64_t totalMs);
 
 void sendWebhookDirect(
     std::string const& title,

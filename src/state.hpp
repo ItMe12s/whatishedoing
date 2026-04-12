@@ -6,7 +6,7 @@
 #include <string>
 
 using Clock = std::chrono::steady_clock;
-using Seconds = std::chrono::seconds;
+using Milliseconds = std::chrono::milliseconds;
 
 struct GameSession {
     Clock::time_point startTime;
@@ -15,7 +15,7 @@ struct GameSession {
 
 struct LevelSession {
     Clock::time_point attemptStart;
-    Seconds accumulated = Seconds::zero();
+    Milliseconds accumulated{};
     int levelID = 0;
     std::string levelName;
     std::string creatorName;
@@ -24,7 +24,7 @@ struct LevelSession {
     int startPercent = 0;
     int bestNotifiedPercent = 0;
 
-    int elapsedSeconds() const;
+    int64_t elapsedMilliseconds() const;
     std::string settingKey() const;
     std::string startTitle() const;
     std::string exitTitle() const;

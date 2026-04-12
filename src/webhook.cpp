@@ -154,6 +154,15 @@ std::string formatDuration(int totalSeconds) {
     return parts[0] + ", " + parts[1] + " and " + parts[2];
 }
 
+std::string formatDurationMs(int64_t totalMs) {
+    if (totalMs < 0) totalMs = 0;
+    if (totalMs < 1000) {
+        if (totalMs == 0) return "0 seconds";
+        return fmt::format("{:.2f} seconds", totalMs / 1000.0);
+    }
+    return formatDuration(static_cast<int>(totalMs / 1000));
+}
+
 void sendWebhookDirect(
     std::string const& title,
     std::string const& description,

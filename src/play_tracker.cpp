@@ -62,11 +62,11 @@ class $modify(MyPlayLayer, PlayLayer) {
         auto displayName = displayLevelName(levelName);
 
         if (session.active && session.levelID == levelID) {
-            session.accumulated += std::chrono::duration_cast<Seconds>(
+            session.accumulated += std::chrono::duration_cast<Milliseconds>(
                 Clock::now() - session.attemptStart
             );
         } else {
-            session.accumulated = Seconds::zero();
+            session.accumulated = Milliseconds::zero();
             session.levelID = levelID;
         }
 
@@ -104,21 +104,23 @@ class $modify(MyPlayLayer, PlayLayer) {
     }
 
     void levelComplete() {
-        PlayLayer::levelComplete();
         markActivity();
-        auto& session = levelSession();
         syncPlayMode(this);
-
+        auto& pre = levelSession();
+        auto elapsed = formatDurationMs(pre.elapsedMilliseconds());
         auto levelName = displayLevelName(std::string(m_level->m_levelName));
         auto creatorName = displayCreatorName(std::string(m_level->m_creatorName));
         auto playerName = getPlayerName();
-        auto elapsed = formatDuration(session.elapsedSeconds());
+        auto completeTitle = pre.completeTitle();
+        auto completeColor = pre.practice ? pre.color() : embed_color::kLevelComplete;
+
+        PlayLayer::levelComplete();
 
         sendWebhook(
             "notify-level-complete",
-            session.completeTitle(),
+            completeTitle,
             fmt::format("{} beat **{}** by **{}**!", playerName, levelName, creatorName),
-            session.practice ? session.color() : embed_color::kLevelComplete,
+            completeColor,
             {
                 {"Level", levelName, true},
                 {"Creator", creatorName, true},
@@ -126,7 +128,7 @@ class $modify(MyPlayLayer, PlayLayer) {
             elapsed
         );
 
-        session.reset();
+        levelSession().reset();
     }
 
     void onQuit() {
@@ -140,7 +142,7 @@ class $modify(MyPlayLayer, PlayLayer) {
         syncPlayMode(this);
 
         auto playerName = getPlayerName();
-        auto elapsed = formatDuration(session.elapsedSeconds());
+        auto elapsed = formatDurationMs(session.elapsedMilliseconds());
         auto levelName = displayLevelName(session.levelName);
         auto creatorName = displayCreatorName(session.creatorName);
 
