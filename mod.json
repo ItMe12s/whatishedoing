@@ -1,0 +1,17 @@
+{
+	"geode": "5.5.3",
+	"gd": {
+		"win": "2.2081",
+		"android": "2.2081",
+		"mac": "2.2081",
+		"ios": "2.2081"
+	},
+	"id": "imes.whatishedoing",
+	"name": "whatishedoing",
+	"version": "1.0.0",
+	"developer": "imes",
+	"description": "What is he doing?",
+	"dependencies": {
+		"geode.node-ids": ">=v1.20.0"
+	}
+}
