@@ -7,10 +7,10 @@
 		"ios": "2.2081"
 	},
 	"id": "imes.whatishedoing",
-	"name": "What is he doing?",
+	"name": "What is he doing? (Webhook Logger)",
 	"version": "1.0.0",
 	"developer": "imes",
-	"description": "Discord webhook notifications for Geometry Dash.",
+	"description": "Discord webhook logger for Geometry Dash.",
 	"dependencies": {
 		"geode.node-ids": ">=v1.20.0"
 	},
