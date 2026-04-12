@@ -1,6 +1,8 @@
 #pragma once
 
 #include <Geode/Geode.hpp>
+#include <Geode/utils/async.hpp>
+#include <Geode/utils/web.hpp>
 
 using namespace geode::prelude;
 
@@ -41,4 +43,32 @@ inline matjson::Value buildWebhookPayload(
     payload["embeds"]   = embedsArr;
 
     return payload;
+}
+
+inline void sendWebhook(
+    std::string const& settingKey,
+    std::string const& title,
+    std::string const& description,
+    int color,
+    std::vector<WebhookField> const& fields = {}
+) {
+    if (!Mod::get()->getSettingValue<bool>(settingKey)) return;
+
+    auto url = Mod::get()->getSettingValue<std::string>("webhook-url");
+    if (url.empty()) return;
+
+    auto payload = buildWebhookPayload(title, description, color, fields);
+
+    auto req = web::WebRequest();
+    req.header("Content-Type", "application/json");
+    req.bodyJSON(payload);
+
+    async::spawn(
+        req.post(url),
+        [](web::WebResponse res) {
+            if (!res.ok()) {
+                log::warn("Webhook POST failed with status {}", res.code());
+            }
+        }
+    );
 }
