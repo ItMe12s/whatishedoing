@@ -11,6 +11,24 @@ using namespace geode::prelude;
 
 $execute
 {
+  GameEvent(GameEventType::Loaded)
+      .listen(
+          []
+          {
+            auto &session = gameSession();
+            if (session.started)
+              return;
+
+            session.started = true;
+            session.startTime = Clock::now();
+
+            auto playerName = getPlayerName();
+            sendWebhook("notify-game-session", "Opened Geometry Dash",
+                        fmt::format("{} opened Geometry Dash!", playerName),
+                        embed_color::kGameOpen);
+          })
+      .leak();
+
   GameEvent(GameEventType::Exiting)
       .listen(
           []
@@ -51,18 +69,6 @@ class $modify(MenuLayer)
     if (!MenuLayer::init())
       return false;
     markActivity();
-
-    auto &session = gameSession();
-    if (!session.started)
-    {
-      session.started = true;
-      session.startTime = Clock::now();
-
-      auto playerName = getPlayerName();
-      sendWebhook("notify-game-session", "Opened Geometry Dash",
-                  fmt::format("{} opened Geometry Dash!", playerName), embed_color::kGameOpen);
-    }
-
     return true;
   }
 };
