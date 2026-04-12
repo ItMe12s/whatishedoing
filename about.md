@@ -10,7 +10,7 @@ Each of these can be turned on or off in the mod settings under **Notification T
 
 - **Opening / exiting Geometry Dash** (with session time)
 - **Playing / exiting a level** (with session info and run time)
-- **Editor playtest** (NOT inside the editor)
+- **Practice runs** (automatically detects for you)
 - **Level complete** (with session info and run time)
 - **New best** (when you finally get a new best on the level)
 - **Opening / exiting the editor** (yes, I'm building and not procrastinating)

@@ -1,18 +1,23 @@
 #include <Geode/binding/GJGameLevel.hpp>
 #include <Geode/modify/PlayLayer.hpp>
 
+#include "embed_colors.hpp"
 #include "state.hpp"
 #include "webhook.hpp"
 
 using namespace geode::prelude;
 
 namespace {
+void syncPlayMode(PlayLayer* layer) {
+    auto& session = levelSession();
+    session.practice = layer->m_isPracticeMode;
+}
+
 void sendNewBestWebhookIfNeeded(GJGameLevel* level) {
-    if (!level) return;
     if (!Mod::get()->getSettingValue<bool>("notify-new-best")) return;
 
     auto& session = levelSession();
-    if (session.practice || session.testPlay) return;
+    if (session.practice) return;
 
     auto currentBest = static_cast<int>(level->m_newNormalPercent2.value());
     if (currentBest <= session.bestNotifiedPercent) return;
@@ -24,8 +29,7 @@ void sendNewBestWebhookIfNeeded(GJGameLevel* level) {
     auto levelName = displayLevelName(std::string(level->m_levelName));
     auto creatorName = displayCreatorName(std::string(level->m_creatorName));
 
-    sendWebhook(
-        "notify-new-best",
+    sendWebhookDirect(
         "New Best!",
         fmt::format(
             "{} reached a new best of **{}%** on **{}** by **{}**.",
@@ -34,7 +38,7 @@ void sendNewBestWebhookIfNeeded(GJGameLevel* level) {
             levelName,
             creatorName
         ),
-        15844367,
+        embed_color::kNewBest,
         {
             {"Level", levelName, true},
             {"Creator", creatorName, true},
@@ -54,40 +58,37 @@ class $modify(MyPlayLayer, PlayLayer) {
         auto levelName = std::string(level->m_levelName);
         auto creatorName = std::string(level->m_creatorName);
         auto creatorDisplayName = displayCreatorName(creatorName);
-        auto levelID = std::to_string(level->m_levelID.value());
-        auto levelIDValue = level->m_levelID.value();
+        auto levelID = level->m_levelID.value();
         auto displayName = displayLevelName(levelName);
 
-        if (session.active && session.levelID == levelIDValue) {
+        if (session.active && session.levelID == levelID) {
             session.accumulated += std::chrono::duration_cast<Seconds>(
                 Clock::now() - session.attemptStart
             );
         } else {
             session.accumulated = Seconds::zero();
-            session.levelID = levelIDValue;
+            session.levelID = levelID;
         }
 
         session.attemptStart = Clock::now();
         session.levelName = levelName;
         session.creatorName = creatorDisplayName;
         session.active = true;
-        session.practice = m_isPracticeMode;
-        session.testPlay = m_isTestMode;
-        session.notifySettingKey = session.testPlay ? "notify-editor-testplay" : "notify-play-level";
+        syncPlayMode(this);
         session.startPercent = static_cast<int>(level->m_normalPercent.value());
         session.bestNotifiedPercent = session.startPercent;
 
         auto playerName = getPlayerName();
 
         sendWebhook(
-            session.notifyKey(),
-            session.testPlay ? fmt::format("Playtesting {}", displayName) : session.startTitle(),
+            session.settingKey(),
+            session.startTitle(),
             fmt::format("{} is now playing **{}** by **{}**.", playerName, displayName, creatorDisplayName),
             session.color(),
             {
                 {"Level", displayName, true},
                 {"Creator", creatorDisplayName, true},
-                {"Level ID", levelID, true},
+                {"Level ID", std::to_string(levelID), true},
             }
         );
 
@@ -99,18 +100,14 @@ class $modify(MyPlayLayer, PlayLayer) {
         auto& session = levelSession();
         if (!session.active) return;
 
-        session.practice = m_isPracticeMode;
-        session.testPlay = m_isTestMode;
+        syncPlayMode(this);
     }
 
     void levelComplete() {
         PlayLayer::levelComplete();
-        if (!m_level) return;
-
         markActivity();
         auto& session = levelSession();
-        session.practice = m_isPracticeMode;
-        session.testPlay = m_isTestMode;
+        syncPlayMode(this);
 
         auto levelName = displayLevelName(std::string(m_level->m_levelName));
         auto creatorName = displayCreatorName(std::string(m_level->m_creatorName));
@@ -118,10 +115,10 @@ class $modify(MyPlayLayer, PlayLayer) {
         auto elapsed = formatDuration(session.elapsedSeconds());
 
         sendWebhook(
-            session.testPlay ? session.notifyKey() : "notify-level-complete",
+            "notify-level-complete",
             session.completeTitle(),
             fmt::format("{} beat **{}** by **{}**!", playerName, levelName, creatorName),
-            session.testPlay ? session.color() : 16766720,
+            session.practice ? session.color() : embed_color::kLevelComplete,
             {
                 {"Level", levelName, true},
                 {"Creator", creatorName, true},
@@ -140,8 +137,7 @@ class $modify(MyPlayLayer, PlayLayer) {
         }
 
         markActivity();
-        session.practice = m_isPracticeMode;
-        session.testPlay = m_isTestMode;
+        syncPlayMode(this);
 
         auto playerName = getPlayerName();
         auto elapsed = formatDuration(session.elapsedSeconds());
@@ -149,10 +145,10 @@ class $modify(MyPlayLayer, PlayLayer) {
         auto creatorName = displayCreatorName(session.creatorName);
 
         sendWebhook(
-            session.notifyKey(),
+            session.settingKey(),
             session.exitTitle(),
             fmt::format("{} exited **{}** after {}.", playerName, levelName, elapsed),
-            session.testPlay ? session.color() : 15548997,
+            session.practice ? session.color() : embed_color::kLevelExit,
             {
                 {"Level", levelName, true},
                 {"Creator", creatorName, true},
@@ -168,9 +164,7 @@ class $modify(MyPlayLayer, PlayLayer) {
         PlayLayer::destroyPlayer(player, object);
         markActivity();
 
-        auto& session = levelSession();
-        session.practice = m_isPracticeMode;
-        session.testPlay = m_isTestMode;
+        syncPlayMode(this);
         sendNewBestWebhookIfNeeded(m_level);
     }
 };

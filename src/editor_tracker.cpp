@@ -2,6 +2,7 @@
 #include <Geode/modify/EditorPauseLayer.hpp>
 #include <Geode/modify/LevelEditorLayer.hpp>
 
+#include "embed_colors.hpp"
 #include "state.hpp"
 #include "webhook.hpp"
 
@@ -20,7 +21,7 @@ void sendEditorExitWebhook(std::string const& actionTitle) {
         "notify-editor",
         actionTitle,
         fmt::format("{} left the editor after {}.", playerName, elapsed),
-        15158332,
+        embed_color::kEditorExit,
         {{"Level", levelName, true}},
         elapsed
     );
@@ -34,19 +35,19 @@ class $modify(MyLevelEditorLayer, LevelEditorLayer) {
         if (!LevelEditorLayer::init(level, unk)) return false;
         markActivity();
 
-        auto levelName = displayLevelName(std::string(level->m_levelName));
-        auto playerName = getPlayerName();
-
         auto& session = editorSession();
         session.startTime = Clock::now();
-        session.levelName = levelName;
+        session.levelName = std::string(level->m_levelName);
         session.active = true;
+
+        auto displayName = displayLevelName(session.levelName);
+        auto playerName = getPlayerName();
 
         sendWebhook(
             "notify-editor",
             "Opened the Editor",
-            fmt::format("{} opened the editor to work on **{}**.", playerName, levelName),
-            15105570
+            fmt::format("{} opened the editor to work on **{}**.", playerName, displayName),
+            embed_color::kEditorOpen
         );
 
         return true;

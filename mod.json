@@ -70,7 +70,7 @@
 			"type": "title",
 			"name": "Notification Toggles"
 		},
-		"notify-game-open": {
+		"notify-game-session": {
 			"type": "bool",
 			"name": "Notify on Opening/Exiting Geometry Dash",
 			"description": "Son, why are you reading this?",
@@ -80,12 +80,6 @@
 			"type": "bool",
 			"name": "Notify on Playing/Exiting a Level",
 			"description": "When starting a level (level name, creator, ID) and when exiting a level (includes time in that level).",
-			"default": true
-		},
-		"notify-editor-testplay": {
-			"type": "bool",
-			"name": "Notify on Editor Playtest",
-			"description": "When playtesting a level from the editor (not in the editor itself).",
 			"default": true
 		},
 		"notify-level-complete": {

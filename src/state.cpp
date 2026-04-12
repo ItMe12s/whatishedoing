@@ -1,3 +1,4 @@
+#include "embed_colors.hpp"
 #include "state.hpp"
 
 using namespace geode::prelude;
@@ -19,32 +20,28 @@ int LevelSession::elapsedSeconds() const {
     return static_cast<int>(total.count());
 }
 
-std::string const& LevelSession::notifyKey() const {
-    return notifySettingKey;
+std::string LevelSession::settingKey() const {
+    return "notify-play-level";
 }
 
 std::string LevelSession::startTitle() const {
-    if (testPlay) return "Playtesting a Level";
     if (practice) return "Playing a Level (Practice)";
     return "Playing a Level";
 }
 
 std::string LevelSession::exitTitle() const {
-    if (testPlay) return "Stopped Playtesting";
     if (practice) return "Exited a Practice Run";
     return "Exited a Level";
 }
 
 std::string LevelSession::completeTitle() const {
-    if (testPlay) return "Finished Playtesting!";
     if (practice) return "Practice Run Complete!";
     return "Level Complete!";
 }
 
 int LevelSession::color() const {
-    if (testPlay) return 16753920;
-    if (practice) return 9807270;
-    return 5763719;
+    if (practice) return embed_color::kPlayPractice;
+    return embed_color::kPlayNormal;
 }
 
 void LevelSession::reset() {
@@ -54,10 +51,8 @@ void LevelSession::reset() {
     creatorName.clear();
     active = false;
     practice = false;
-    testPlay = false;
     startPercent = 0;
     bestNotifiedPercent = 0;
-    notifySettingKey = "notify-play-level";
 }
 
 void EditorSession::reset() {

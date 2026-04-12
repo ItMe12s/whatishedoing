@@ -21,13 +21,11 @@ struct LevelSession {
     std::string creatorName;
     bool active = false;
     bool practice = false;
-    bool testPlay = false;
     int startPercent = 0;
     int bestNotifiedPercent = 0;
-    std::string notifySettingKey = "notify-play-level";
 
     int elapsedSeconds() const;
-    std::string const& notifyKey() const;
+    std::string settingKey() const;
     std::string startTitle() const;
     std::string exitTitle() const;
     std::string completeTitle() const;
