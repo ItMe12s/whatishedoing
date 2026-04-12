@@ -384,11 +384,13 @@ class $modify(MyCCDirector, cocos2d::CCDirector) {
 };
 
 class $modify(MyCCKeyboardDispatcher, cocos2d::CCKeyboardDispatcher) {
-  void dispatchKeyboardMSG(cocos2d::enumKeyCodes key, bool down, bool repeat) {
+  bool dispatchKeyboardMSG(cocos2d::enumKeyCodes key, bool down, bool repeat,
+                           double timestamp) {
     if (down) {
       markActivity();
     }
-    cocos2d::CCKeyboardDispatcher::dispatchKeyboardMSG(key, down, repeat);
+    return cocos2d::CCKeyboardDispatcher::dispatchKeyboardMSG(key, down, repeat,
+                                                              timestamp);
   }
 };
 
