@@ -4,6 +4,7 @@
 #include <Geode/modify/MenuLayer.hpp>
 
 #include "embed_colors.hpp"
+#include "idle_tracker.hpp"
 #include "state.hpp"
 #include "webhook.hpp"
 
@@ -15,6 +16,8 @@ $execute
       .listen(
           []
           {
+            registerIdlePolling();
+
             auto &session = gameSession();
             if (session.started)
               return;

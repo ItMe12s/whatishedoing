@@ -1,7 +1,9 @@
-#include <Geode/modify/CCDirector.hpp>
+#include "idle_tracker.hpp"
+
+#include <Geode/cocos/base_nodes/CCNode.h>
+#include <Geode/loader/Loader.hpp>
 #include <Geode/modify/CCKeyboardDispatcher.hpp>
 #include <Geode/modify/CCTouchDispatcher.hpp>
-#include <Geode/cocos/CCScheduler.h>
 #include <array>
 
 #include "embed_colors.hpp"
@@ -38,25 +40,42 @@ void checkIdleThresholds() {
         idleThresholdMask() |= mask;
     }
 }
-} // namespace
 
-class $modify(MyCCDirector, cocos2d::CCDirector) {
-    bool init() {
-        if (!cocos2d::CCDirector::init()) return false;
-
-        this->getScheduler()->scheduleSelector(
-            schedule_selector(MyCCDirector::idlePoll),
-            this,
-            1.f,
-            false
-        );
-        return true;
+class IdlePollNode : public cocos2d::CCNode {
+public:
+    static IdlePollNode* create() {
+        auto* node = new IdlePollNode();
+        if (node && node->init()) {
+            node->autorelease();
+            return node;
+        }
+        delete node;
+        return nullptr;
     }
 
-    void idlePoll(float) {
+    void poll(float) {
         checkIdleThresholds();
     }
 };
+} // namespace
+
+void registerIdlePolling() {
+    Loader::get()->queueInMainThread([] {
+        static bool registered = false;
+        if (registered) return;
+
+        if (!cocos2d::CCDirector::sharedDirector()) return;
+
+        auto* node = IdlePollNode::create(); // It's just 1 extra node :please:
+        if (!node) return;
+
+        node->retain();
+        node->schedule(schedule_selector(IdlePollNode::poll), 1.f);
+
+        registered = true;
+        log::info("Hi from idle tracker");
+    });
+}
 
 class $modify(MyCCKeyboardDispatcher, cocos2d::CCKeyboardDispatcher) {
     bool dispatchKeyboardMSG(cocos2d::enumKeyCodes key, bool down, bool repeat, double timestamp) {
