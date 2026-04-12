@@ -15,11 +15,12 @@
 		"geode.node-ids": ">=v1.20.0"
 	},
 	"links": {
-		"community": "https://discord.gg/E8f6D6XqbW"
+		"community": "https://discord.gg/E8f6D6XqbW",
+		"source": "https://github.com/ItMe12s/whatishedoing"
 	},
 	"tags": [
 		"online",
-		"joke"
+		"utility"
 	],
 	"settings": {
 		"webhook-title": {
