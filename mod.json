@@ -39,6 +39,12 @@
 			"description": "The name shown as the sender in Discord.",
 			"default": "What is he doing?"
 		},
+		"player-name": {
+			"type": "string",
+			"name": "Player Name",
+			"description": "The name used in notifications (e.g., 'He opened Geometry Dash!').",
+			"default": "He"
+		},
 		"notify-title": {
 			"type": "title",
 			"name": "Notification Toggles"
@@ -46,7 +52,7 @@
 		"notify-game-open": {
 			"type": "bool",
 			"name": "Notify on Game Open",
-			"description": "Send a message when the main menu is first reached.",
+			"description": "Send a message when the main menu is first opened.",
 			"default": true
 		},
 		"notify-play-level": {

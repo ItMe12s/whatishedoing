@@ -12,6 +12,29 @@ struct WebhookField {
     bool inline_field = true;
 };
 
+inline std::string formatDuration(int totalSeconds) {
+    if (totalSeconds < 0) totalSeconds = 0;
+
+    auto hours = totalSeconds / 3600;
+    auto minutes = (totalSeconds % 3600) / 60;
+    auto seconds = totalSeconds % 60;
+
+    std::vector<std::string> parts;
+    if (hours > 0) {
+        parts.push_back(fmt::format("{} hour{}", hours, hours == 1 ? "" : "s"));
+    }
+    if (minutes > 0) {
+        parts.push_back(fmt::format("{} minute{}", minutes, minutes == 1 ? "" : "s"));
+    }
+    if (seconds > 0 || parts.empty()) {
+        parts.push_back(fmt::format("{} second{}", seconds, seconds == 1 ? "" : "s"));
+    }
+
+    if (parts.size() == 1) return parts[0];
+    if (parts.size() == 2) return fmt::format("{} and {}", parts[0], parts[1]);
+    return fmt::format("{}, {} and {}", parts[0], parts[1], parts[2]);
+}
+
 inline matjson::Value buildWebhookPayload(
     std::string const& title,
     std::string const& description,
