@@ -21,7 +21,7 @@ int64_t LevelSession::elapsedMilliseconds() const {
 }
 
 std::string LevelSession::settingKey() const {
-    return "notify-play-level";
+    return "notify-play-level"; // legacy code from 8 hours ago btw, fixing this next update
 }
 
 std::string LevelSession::startTitle() const {

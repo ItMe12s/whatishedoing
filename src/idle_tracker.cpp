@@ -12,6 +12,7 @@
 
 using namespace geode::prelude;
 
+// making this customizable next update
 namespace {
 constexpr std::array<int, 3> kIdleThresholdSeconds = {300, 1800, 7200};
 constexpr std::array<const char*, 3> kIdleThresholdTitles = {
@@ -41,6 +42,7 @@ void checkIdleThresholds() {
     }
 }
 
+// this is not it bro but i can add extra stuff later
 class IdlePollNode : public cocos2d::CCNode {
 public:
     static IdlePollNode* create() {
@@ -66,7 +68,7 @@ void registerIdlePolling() {
 
         if (!cocos2d::CCDirector::sharedDirector()) return;
 
-        auto* node = IdlePollNode::create(); // It's just 1 extra node :please:
+        auto* node = IdlePollNode::create();
         if (!node) return;
 
         node->retain();

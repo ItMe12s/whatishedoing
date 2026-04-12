@@ -1,5 +1,6 @@
 #pragma once
 
+// figure out how to do geode colors next update
 namespace embed_color {
 
 inline constexpr int kGameClose = 0x992D22;

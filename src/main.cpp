@@ -1,6 +1,5 @@
 #include <Geode/Geode.hpp>
 #include <Geode/loader/GameEvent.hpp>
-#include <Geode/loader/SettingV3.hpp>
 #include <Geode/modify/MenuLayer.hpp>
 
 #include "embed_colors.hpp"

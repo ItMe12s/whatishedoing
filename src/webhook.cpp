@@ -62,6 +62,7 @@ matjson::Value buildWebhookPayload(
     return payload;
 }
 
+// there's some discord rate limit return code i can use but it's not important rn
 std::optional<int> backoffSecondsForFailedAttempt(
     web::WebResponse const& res,
     int attempt,
