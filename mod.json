@@ -7,11 +7,57 @@
 		"ios": "2.2081"
 	},
 	"id": "imes.whatishedoing",
-	"name": "whatishedoing",
+	"name": "What is he doing?",
 	"version": "1.0.0",
 	"developer": "imes",
 	"description": "What is he doing?",
 	"dependencies": {
 		"geode.node-ids": ">=v1.20.0"
+	},
+	"settings": {
+		"webhook-title": {
+			"type": "title",
+			"name": "Discord Webhook"
+		},
+		"webhook-url": {
+			"type": "string",
+			"name": "Webhook URL",
+			"description": "Your Discord webhook URL. Leave empty to disable all notifications.",
+			"default": ""
+		},
+		"webhook-username": {
+			"type": "string",
+			"name": "Webhook Display Name",
+			"description": "The name shown as the sender in Discord.",
+			"default": "What is he doing?"
+		},
+		"notify-title": {
+			"type": "title",
+			"name": "Notification Toggles"
+		},
+		"notify-game-open": {
+			"type": "bool",
+			"name": "Notify on Game Open",
+			"description": "Send a message when the main menu is first reached.",
+			"default": true
+		},
+		"notify-play-level": {
+			"type": "bool",
+			"name": "Notify on Playing a Level",
+			"description": "Send a message when entering a level.",
+			"default": true
+		},
+		"notify-editor": {
+			"type": "bool",
+			"name": "Notify on Opening the Editor",
+			"description": "Send a message when opening the level editor.",
+			"default": true
+		},
+		"notify-level-complete": {
+			"type": "bool",
+			"name": "Notify on Level Complete",
+			"description": "Send a message when a level is completed.",
+			"default": true
+		}
 	}
 }
