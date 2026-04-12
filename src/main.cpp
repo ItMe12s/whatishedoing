@@ -1,5 +1,5 @@
 #include <Geode/Geode.hpp>
-#include <Geode/modify/AppDelegate.hpp>
+#include <Geode/loader/GameEvent.hpp>
 #include <Geode/modify/EditorPauseLayer.hpp>
 #include <Geode/modify/MenuLayer.hpp>
 #include <Geode/modify/PlayLayer.hpp>
@@ -85,6 +85,28 @@ void sendEditorExitWebhook(std::string const& actionTitle) {
 }
 } // namespace
 
+$execute {
+    GameEvent(GameEventType::Exiting).listen(
+        [] {
+            if (!g_gameSessionStarted) return;
+
+            auto playerName = getPlayerName();
+            auto elapsed = formatDuration(secondsSince(g_gameSessionStart));
+
+            sendWebhook(
+                "notify-game-open",
+                "Closed Geometry Dash",
+                fmt::format("{} exited Geometry Dash after {}.", playerName, elapsed),
+                10038562,
+                {
+                    { "Session Time", elapsed, true }
+                }
+            );
+        },
+        0
+    ).leak();
+}
+
 class $modify(MenuLayer) {
     bool init() {
         if (!MenuLayer::init()) return false;
@@ -105,27 +127,6 @@ class $modify(MenuLayer) {
         }
 
         return true;
-    }
-};
-
-class $modify(MyAppDelegate, AppDelegate) {
-    void platformShutdown() {
-        if (g_gameSessionStarted) {
-            auto playerName = getPlayerName();
-            auto elapsed = formatDuration(secondsSince(g_gameSessionStart));
-
-            sendWebhook(
-                "notify-game-open",
-                "Closed Geometry Dash",
-                fmt::format("{} exited Geometry Dash after {}.", playerName, elapsed),
-                10038562,
-                {
-                    { "Session Time", elapsed, true }
-                }
-            );
-        }
-
-        AppDelegate::platformShutdown();
     }
 };
 
