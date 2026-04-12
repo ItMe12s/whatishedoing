@@ -10,7 +10,7 @@
 	"name": "What is he doing?",
 	"version": "1.0.0",
 	"developer": "imes",
-	"description": "What is he doing?",
+	"description": "Discord webhook notifications for Geometry Dash.",
 	"dependencies": {
 		"geode.node-ids": ">=v1.20.0"
 	},
@@ -29,7 +29,7 @@
 		"webhook-url": {
 			"type": "string",
 			"name": "Webhook URL",
-			"description": "Your Discord webhook URL. Leave empty to disable all notifications.",
+			"description": "Your Discord webhook URL. Leave empty to disable.",
 			"default": "",
 			"filter": "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789:/.?=-_"
 		},
@@ -42,7 +42,7 @@
 		"player-name": {
 			"type": "string",
 			"name": "Player Name",
-			"description": "The name used in notifications (e.g., 'He opened Geometry Dash!').",
+			"description": "Subject of each Discord message (e.g., 'imes opened Geometry Dash!'). Empty defaults to 'He'.",
 			"default": "He"
 		},
 		"notify-title": {
@@ -52,25 +52,25 @@
 		"notify-game-open": {
 			"type": "bool",
 			"name": "Notify on Game Open",
-			"description": "Send a message when the main menu is first opened.",
+			"description": "When the game is opened (main menu) and when Geometry Dash is closed (includes session length).",
 			"default": true
 		},
 		"notify-play-level": {
 			"type": "bool",
 			"name": "Notify on Playing a Level",
-			"description": "Send a message when entering a level.",
-			"default": true
-		},
-		"notify-editor": {
-			"type": "bool",
-			"name": "Notify on Opening the Editor",
-			"description": "Send a message when opening the level editor.",
+			"description": "When starting a level (level name, creator, ID) and when quitting a level (includes time in that level).",
 			"default": true
 		},
 		"notify-level-complete": {
 			"type": "bool",
 			"name": "Notify on Level Complete",
-			"description": "Send a message when a level is completed.",
+			"description": "When a level is beaten (includes level info and total time spent on that run).",
+			"default": true
+		},
+		"notify-editor": {
+			"type": "bool",
+			"name": "Notify on Opening the Editor",
+			"description": "When opening the level editor and when leaving it (save & exit, exit, or exit without save), with session length.",
 			"default": true
 		}
 	}
