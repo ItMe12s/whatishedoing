@@ -10,6 +10,8 @@ using namespace geode::prelude;
 
 namespace {
 void sendEditorExitWebhook(std::string const& actionTitle) {
+    levelSession().reset();
+
     auto& session = editorSession();
     if (!session.active) return;
 
@@ -34,6 +36,7 @@ class $modify(MyLevelEditorLayer, LevelEditorLayer) {
     bool init(GJGameLevel* level, bool unk) {
         if (!LevelEditorLayer::init(level, unk)) return false;
         markActivity();
+        levelSession().reset();
 
         auto& session = editorSession();
         session.startTime = Clock::now();
@@ -55,6 +58,12 @@ class $modify(MyLevelEditorLayer, LevelEditorLayer) {
 };
 
 class $modify(MyEditorPauseLayer, EditorPauseLayer) {
+    void onSaveAndPlay(cocos2d::CCObject* sender) {
+        markActivity();
+        sendEditorExitWebhook("Save and Play");
+        EditorPauseLayer::onSaveAndPlay(sender);
+    }
+
     void onSaveAndExit(cocos2d::CCObject* sender) {
         markActivity();
         sendEditorExitWebhook("Exited the Editor");

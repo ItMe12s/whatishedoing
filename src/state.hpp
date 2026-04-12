@@ -8,6 +8,8 @@
 using Clock = std::chrono::steady_clock;
 using Milliseconds = std::chrono::milliseconds;
 
+inline constexpr int kLevelSessionClearedId = -67;
+
 struct GameSession {
     Clock::time_point startTime;
     bool started = false;
@@ -16,7 +18,7 @@ struct GameSession {
 struct LevelSession {
     Clock::time_point attemptStart;
     Milliseconds accumulated{};
-    int levelID = 0;
+    int levelID = kLevelSessionClearedId;
     std::string levelName;
     std::string creatorName;
     bool active = false;

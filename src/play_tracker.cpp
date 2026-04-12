@@ -1,5 +1,6 @@
 #include <Geode/binding/GJGameLevel.hpp>
 #include <Geode/modify/PlayLayer.hpp>
+#include <vector>
 
 #include "embed_colors.hpp"
 #include "state.hpp"
@@ -69,19 +70,19 @@ void sendNewBestWebhookIfNeeded(GJGameLevel* level) {
 
 class $modify(MyPlayLayer, PlayLayer) {
     bool init(GJGameLevel* level, bool useReplay, bool dontCreateObjects) {
+        auto& session = levelSession();
+        std::string const levelName = level ? std::string(level->m_levelName) : "";
+        int const levelID = level ? level->m_levelID.value() : kLevelSessionClearedId;
+        bool const isContinuation =
+            level && session.active && session.levelID == levelID
+            && session.levelName == levelName;
+
         if (!PlayLayer::init(level, useReplay, dontCreateObjects)) return false;
         markActivity();
 
-        auto& session = levelSession();
-
-        auto levelName = std::string(level->m_levelName);
         auto creatorName = std::string(level->m_creatorName);
         auto creatorDisplayName = displayCreatorName(creatorName);
-        auto levelID = level->m_levelID.value();
         auto displayName = displayLevelName(levelName);
-
-        bool const isContinuation =
-            session.active && session.levelID == levelID;
 
         if (isContinuation) {
             session.accumulated += std::chrono::duration_cast<Milliseconds>(
@@ -103,20 +104,28 @@ class $modify(MyPlayLayer, PlayLayer) {
         auto playerName = getPlayerName();
 
         if (!isContinuation) {
+            std::vector<WebhookField> fields = {
+                {"Level", displayName, true},
+                {"Creator", creatorDisplayName, true},
+            };
+            if (levelID > 0) {
+                fields.push_back({"Level ID", std::to_string(levelID), true});
+            }
             sendWebhook(
                 session.settingKey(),
                 session.startTitle(),
                 fmt::format("{} is now playing **{}** by **{}**.", playerName, displayName, creatorDisplayName),
                 session.color(),
-                {
-                    {"Level", displayName, true},
-                    {"Creator", creatorDisplayName, true},
-                    {"Level ID", std::to_string(levelID), true},
-                }
+                fields
             );
         }
 
         return true;
+    }
+
+    void resetLevel() {
+        PlayLayer::resetLevel();
+        reopenLevelSessionIfNeeded(this);
     }
 
     void togglePracticeMode(bool practiceMode) {

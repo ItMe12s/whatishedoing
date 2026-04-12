@@ -46,7 +46,7 @@ int LevelSession::color() const {
 
 void LevelSession::reset() {
     accumulated = Milliseconds::zero();
-    levelID = 0;
+    levelID = kLevelSessionClearedId;
     levelName.clear();
     creatorName.clear();
     active = false;
