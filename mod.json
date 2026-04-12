@@ -8,7 +8,7 @@
 	},
 	"id": "imes.whatishedoing",
 	"name": "What is he doing? (Webhook Logger)",
-	"version": "1.0.0",
+	"version": "1.0.1",
 	"developer": "imes",
 	"description": "Discord webhook logger for Geometry Dash.",
 	"dependencies": {
