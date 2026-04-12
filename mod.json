@@ -14,6 +14,13 @@
 	"dependencies": {
 		"geode.node-ids": ">=v1.20.0"
 	},
+	"links": {
+		"community": "https://discord.gg/E8f6D6XqbW"
+	},
+	"tags": [
+		"online",
+		"joke"
+	],
 	"settings": {
 		"webhook-title": {
 			"type": "title",
@@ -23,7 +30,8 @@
 			"type": "string",
 			"name": "Webhook URL",
 			"description": "Your Discord webhook URL. Leave empty to disable all notifications.",
-			"default": ""
+			"default": "",
+			"filter": "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789:/.?=-_"
 		},
 		"webhook-username": {
 			"type": "string",
