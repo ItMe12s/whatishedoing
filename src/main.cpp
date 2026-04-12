@@ -302,12 +302,22 @@ class $modify(MyPlayLayer, PlayLayer) {
     return true;
   }
 
+  void togglePracticeMode(bool practiceMode) {
+    PlayLayer::togglePracticeMode(practiceMode);
+    if (!g_levelSessionActive)
+      return;
+    g_levelSessionPractice = m_isPracticeMode;
+    g_levelSessionTestPlay = m_isTestMode;
+  }
+
   void levelComplete() {
     PlayLayer::levelComplete();
 
     if (!m_level)
       return;
     markActivity();
+    g_levelSessionPractice = m_isPracticeMode;
+    g_levelSessionTestPlay = m_isTestMode;
 
     auto levelName = displayLevelName(std::string(m_level->m_levelName));
     auto creatorName = displayCreatorName(std::string(m_level->m_creatorName));
@@ -331,6 +341,8 @@ class $modify(MyPlayLayer, PlayLayer) {
       return;
     }
     markActivity();
+    g_levelSessionPractice = m_isPracticeMode;
+    g_levelSessionTestPlay = m_isTestMode;
 
     auto playerName = getPlayerName();
     auto elapsed = formatDuration(currentLevelSessionSeconds());
@@ -351,6 +363,8 @@ class $modify(MyPlayLayer, PlayLayer) {
   void destroyPlayer(PlayerObject *player, GameObject *object) {
     PlayLayer::destroyPlayer(player, object);
     markActivity();
+    g_levelSessionPractice = m_isPracticeMode;
+    g_levelSessionTestPlay = m_isTestMode;
     sendNewBestWebhookIfNeeded(m_level);
   }
 };
