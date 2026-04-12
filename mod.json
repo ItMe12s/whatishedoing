@@ -36,7 +36,7 @@
 		"webhook-username": {
 			"type": "string",
 			"name": "Webhook Display Name",
-			"description": "The Webhook's Display Name. Leave empty to use the default.",
+			"description": "The webhook's display name. Leave empty to use the default.",
 			"default": "What is he doing?"
 		},
 		"test-webhook": {
@@ -78,13 +78,13 @@
 		"notify-editor-testplay": {
 			"type": "bool",
 			"name": "Notify on Editor Playtest",
-			"description": "When playtesting a level from the editor (NOT inside the level editor).",
+			"description": "When playtesting a level from the editor (not in the editor itself).",
 			"default": true
 		},
 		"notify-level-complete": {
 			"type": "bool",
 			"name": "Notify on Level Complete",
-			"description": "When a level is beaten (includes level info and total time spent on that run).",
+			"description": "When a level is completed (includes level info and total time spent on that run).",
 			"default": true
 		},
 		"notify-new-best": {
@@ -102,7 +102,7 @@
 		"notify-idle": {
 			"type": "bool",
 			"name": "Notify on Idle",
-			"description": "Send a webhook when you've been idle for 5m, 30m, or 2h. Could be useful to call emergency services.",
+			"description": "When you've been idle for 5m, 30m, or 2h. Could be useful to call emergency services.",
 			"default": true
 		}
 	}

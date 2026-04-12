@@ -10,10 +10,10 @@ Each of these can be turned on or off in the mod settings under **Notification T
 
 - **Opening / exiting Geometry Dash** (with session time)
 - **Playing / exiting a level** (with session info and run time)
-- **Editor playtest** (NOT in the editor)
+- **Editor playtest** (NOT inside the editor)
 - **Level complete** (with session info and run time)
 - **New best** (when you finally get a new best on the level)
-- **Opening / exiting the editor** (yes, i'm building and not procrastinating)
+- **Opening / exiting the editor** (yes, I'm building and not procrastinating)
 - **Idle** (after you have been afking for 5 minutes, 30 minutes, or 2 hours)
 
 ## Security / Privacy

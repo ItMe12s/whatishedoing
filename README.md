@@ -1,6 +1,6 @@
 # What is he doing?
 
-A Discord Webhook logger for actions in Geometry Dash such as playing a level or editing one.
+A Discord webhook logger for actions in Geometry Dash such as playing a level or editing one.
 
 ## Resources
 
