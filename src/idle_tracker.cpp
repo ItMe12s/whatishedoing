@@ -1,6 +1,7 @@
 #include <Geode/modify/CCDirector.hpp>
 #include <Geode/modify/CCKeyboardDispatcher.hpp>
 #include <Geode/modify/CCTouchDispatcher.hpp>
+#include <Geode/cocos/CCScheduler.h>
 #include <array>
 
 #include "state.hpp"
@@ -39,9 +40,23 @@ void checkIdleThresholds() {
 } // namespace
 
 class $modify(MyCCDirector, cocos2d::CCDirector) {
-    void drawScene() {
+    bool init() {
+        if (!cocos2d::CCDirector::init()) return false;
+
+        auto scheduler = this->getScheduler();
+        if (scheduler) {
+            scheduler->scheduleSelector(
+                schedule_selector(MyCCDirector::idlePoll),
+                this,
+                1.f,
+                false
+            );
+        }
+        return true;
+    }
+
+    void idlePoll(float) {
         checkIdleThresholds();
-        cocos2d::CCDirector::drawScene();
     }
 };
 
