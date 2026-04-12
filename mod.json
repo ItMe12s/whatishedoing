@@ -39,6 +39,20 @@
 			"description": "The name shown as the sender in Discord.",
 			"default": "What is he doing?"
 		},
+		"test-webhook": {
+			"type": "bool",
+			"name": "Send Test Webhook",
+			"description": "Toggle on to send a test webhook immediately.",
+			"default": false
+		},
+		"max-retries": {
+			"type": "int",
+			"name": "Max Webhook Retries",
+			"description": "How many times to retry a failed webhook before giving up.",
+			"default": 3,
+			"min": 0,
+			"max": 10
+		},
 		"player-name": {
 			"type": "string",
 			"name": "Player Name",
@@ -51,14 +65,20 @@
 		},
 		"notify-game-open": {
 			"type": "bool",
-			"name": "Notify on Game Open",
+			"name": "Notify on Opening/Exiting Geometry Dash",
 			"description": "When the game is opened (main menu) and when Geometry Dash is closed (includes session length).",
 			"default": true
 		},
 		"notify-play-level": {
 			"type": "bool",
-			"name": "Notify on Playing a Level",
-			"description": "When starting a level (level name, creator, ID) and when quitting a level (includes time in that level).",
+			"name": "Notify on Playing/Exiting a Level",
+			"description": "When starting a level (level name, creator, ID) and when exiting a level (includes time in that level).",
+			"default": true
+		},
+		"notify-editor-testplay": {
+			"type": "bool",
+			"name": "Notify on Editor Playtest",
+			"description": "When playtesting a level from the editor.",
 			"default": true
 		},
 		"notify-level-complete": {
@@ -67,10 +87,22 @@
 			"description": "When a level is beaten (includes level info and total time spent on that run).",
 			"default": true
 		},
+		"notify-new-best": {
+			"type": "bool",
+			"name": "Notify on Session's New Best",
+			"description": "When you get a new best on a level (current level session only).",
+			"default": true
+		},
 		"notify-editor": {
 			"type": "bool",
-			"name": "Notify on Opening the Editor",
+			"name": "Notify on Opening/Exiting the Editor",
 			"description": "When opening the level editor and when leaving it (save & exit, exit, or exit without save), with session length.",
+			"default": true
+		},
+		"notify-idle": {
+			"type": "bool",
+			"name": "Notify on Idle",
+			"description": "Send a webhook when you've been idle for 30s, 2m, 15m, or 1h.",
 			"default": true
 		}
 	}
