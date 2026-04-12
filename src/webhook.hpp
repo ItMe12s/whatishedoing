@@ -98,6 +98,42 @@ inline matjson::Value buildWebhookPayload(
     return payload;
 }
 
+inline void postWebhookSyncWithRetries(
+    std::string const& url,
+    matjson::Value const& payload,
+    int attempt,
+    int maxRetries
+) {
+    auto req = web::WebRequest();
+    req.header("Content-Type", "application/json");
+    req.bodyJSON(payload);
+    req.timeout(std::chrono::seconds(10));
+
+    auto res = req.postSync(url);
+    if (res.ok()) return;
+
+    if (attempt >= maxRetries) {
+        log::warn(
+            "Webhook POST failed after {} attempts (status {})",
+            attempt + 1,
+            res.code()
+        );
+        return;
+    }
+
+    auto waitSeconds = 1 << attempt;
+    log::warn(
+        "Webhook POST failed (status {}), retrying in {}s ({}/{})",
+        res.code(),
+        waitSeconds,
+        attempt + 1,
+        maxRetries + 1
+    );
+
+    std::this_thread::sleep_for(std::chrono::seconds(waitSeconds));
+    postWebhookSyncWithRetries(url, payload, attempt + 1, maxRetries);
+}
+
 inline void postWebhookWithRetries(
     std::string const& url,
     matjson::Value payload,
@@ -107,6 +143,7 @@ inline void postWebhookWithRetries(
     auto req = web::WebRequest();
     req.header("Content-Type", "application/json");
     req.bodyJSON(payload);
+    req.timeout(std::chrono::seconds(10));
 
     async::spawn(
         req.post(url),
@@ -152,7 +189,12 @@ inline void sendWebhookDirect(
     auto payload = buildWebhookPayload(title, description, color, fields, footer);
     auto maxRetries = static_cast<int>(Mod::get()->getSettingValue<int64_t>("max-retries"));
     if (maxRetries < 0) maxRetries = 0;
-    postWebhookWithRetries(url, payload, 0, maxRetries);
+
+    if (Mod::get()->getSettingValue<bool>("blocking-webhook")) {
+        postWebhookSyncWithRetries(url, payload, 0, maxRetries);
+    } else {
+        postWebhookWithRetries(url, payload, 0, maxRetries);
+    }
 }
 
 inline void sendWebhook(

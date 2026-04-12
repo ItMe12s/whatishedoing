@@ -54,6 +54,12 @@
 			"min": 0,
 			"max": 10
 		},
+		"blocking-webhook": {
+			"type": "bool",
+			"name": "Blocking Webhook (READ DESCRIPTION)",
+			"description": "Make the webhook HTTP run on the main thread and waits for a response (astronomically worst case it takes up to almost a minute before giving up). Enable this if you really want it to always send when you exit the game.",
+			"default": false
+		},
 		"player-name": {
 			"type": "string",
 			"name": "Player Name",
