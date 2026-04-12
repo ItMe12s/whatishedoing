@@ -23,8 +23,7 @@
 			"type": "string",
 			"name": "Webhook URL",
 			"description": "Your Discord webhook URL. Leave empty to disable all notifications.",
-			"default": "",
-			"match": ".*"
+			"default": ""
 		},
 		"webhook-username": {
 			"type": "string",
