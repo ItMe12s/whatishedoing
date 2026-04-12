@@ -42,7 +42,8 @@ void sendWebhook(
     req.header("Content-Type", "application/json");
     req.bodyJSON(payload);
 
-    async::spawn(
+    static TaskHolder<web::WebResponse> s_task;
+    s_task.spawn(
         req.post(url),
         [](web::WebResponse res) {
             if (!res.ok()) {
