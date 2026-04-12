@@ -13,15 +13,34 @@ void syncPlayMode(PlayLayer* layer) {
     session.practice = layer->m_isPracticeMode;
 }
 
+void reopenLevelSessionIfNeeded(PlayLayer* layer) {
+    auto& session = levelSession();
+    if (session.active || !layer->m_level) return;
+
+    auto* level = layer->m_level;
+    session.levelID = level->m_levelID.value();
+    session.levelName = std::string(level->m_levelName);
+    session.creatorName = displayCreatorName(std::string(level->m_creatorName));
+    session.accumulated = Milliseconds::zero();
+    session.attemptStart = Clock::now();
+    session.active = true;
+    session.startPercent = static_cast<int>(level->m_normalPercent.value());
+    session.bestNotifiedPercent = session.startPercent;
+    syncPlayMode(layer);
+}
+
 void sendNewBestWebhookIfNeeded(GJGameLevel* level) {
     if (!Mod::get()->getSettingValue<bool>("notify-new-best")) return;
 
     auto& session = levelSession();
+    if (!session.active || !level) return;
+    if (session.levelID != level->m_levelID.value()) return;
     if (session.practice) return;
 
     auto currentBest = static_cast<int>(level->m_newNormalPercent2.value());
     if (currentBest <= session.bestNotifiedPercent) return;
     if (currentBest <= session.startPercent) return;
+    if (currentBest >= 100) return;
 
     session.bestNotifiedPercent = currentBest;
 
@@ -61,7 +80,10 @@ class $modify(MyPlayLayer, PlayLayer) {
         auto levelID = level->m_levelID.value();
         auto displayName = displayLevelName(levelName);
 
-        if (session.active && session.levelID == levelID) {
+        bool const isContinuation =
+            session.active && session.levelID == levelID;
+
+        if (isContinuation) {
             session.accumulated += std::chrono::duration_cast<Milliseconds>(
                 Clock::now() - session.attemptStart
             );
@@ -80,23 +102,28 @@ class $modify(MyPlayLayer, PlayLayer) {
 
         auto playerName = getPlayerName();
 
-        sendWebhook(
-            session.settingKey(),
-            session.startTitle(),
-            fmt::format("{} is now playing **{}** by **{}**.", playerName, displayName, creatorDisplayName),
-            session.color(),
-            {
-                {"Level", displayName, true},
-                {"Creator", creatorDisplayName, true},
-                {"Level ID", std::to_string(levelID), true},
-            }
-        );
+        if (!isContinuation) {
+            sendWebhook(
+                session.settingKey(),
+                session.startTitle(),
+                fmt::format("{} is now playing **{}** by **{}**.", playerName, displayName, creatorDisplayName),
+                session.color(),
+                {
+                    {"Level", displayName, true},
+                    {"Creator", creatorDisplayName, true},
+                    {"Level ID", std::to_string(levelID), true},
+                }
+            );
+        }
 
         return true;
     }
 
     void togglePracticeMode(bool practiceMode) {
         PlayLayer::togglePracticeMode(practiceMode);
+        if (practiceMode) {
+            reopenLevelSessionIfNeeded(this);
+        }
         auto& session = levelSession();
         if (!session.active) return;
 
@@ -107,6 +134,10 @@ class $modify(MyPlayLayer, PlayLayer) {
         markActivity();
         syncPlayMode(this);
         auto& pre = levelSession();
+        if (!pre.active) {
+            PlayLayer::levelComplete();
+            return;
+        }
         auto elapsed = formatDurationMs(pre.elapsedMilliseconds());
         auto levelName = displayLevelName(std::string(m_level->m_levelName));
         auto creatorName = displayCreatorName(std::string(m_level->m_creatorName));
@@ -115,6 +146,8 @@ class $modify(MyPlayLayer, PlayLayer) {
         auto completeColor = pre.practice ? pre.color() : embed_color::kLevelComplete;
 
         PlayLayer::levelComplete();
+
+        sendNewBestWebhookIfNeeded(m_level);
 
         sendWebhook(
             "notify-level-complete",
