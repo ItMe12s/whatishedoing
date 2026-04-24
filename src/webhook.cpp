@@ -8,6 +8,7 @@
 #include <cctype>
 #include <ctime>
 #include <optional>
+#include <string_view>
 #include <thread>
 
 using namespace geode::prelude;
@@ -112,8 +113,11 @@ std::optional<int> backoffSecondsForFailedAttempt(
     }
     if (res.code() == 429) {
         auto const ra = res.header("Retry-After");
-        if (!ra.empty()) {
-            auto const n = geode::utils::numFromString<int>(ra, 10);
+        if (ra && !ra->empty()) {
+            auto const n = geode::utils::numFromString<int>(
+                std::string_view{*ra},
+                10
+            );
             return n.mapOr(2, [](int v) {
                 return std::clamp(v, 1, 86'400);
             });

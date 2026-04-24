@@ -23,9 +23,8 @@ void sendEditorExitWebhook(std::string const& actionTitle) {
         "notify-editor",
         actionTitle,
         fmt::format(
-            "{} left the editor after {}.",
-            playerName,
-            elapsed
+            "{} left the editor.",
+            playerName
         ),
         embed_color::kEditorExit,
         {{"Level", levelName, true}},

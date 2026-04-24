@@ -56,8 +56,8 @@
 		},
 		"blocking-webhook": {
 			"type": "bool",
-			"name": "Blocking request on exit",
-			"description": "If enabled, the \"Closed Geometry Dash\" message uses a blocking request so it is more likely to finish before the process ends. Can freeze the game for up to several tens of seconds in worst case. Not used for any other notification.",
+			"name": "Blocking request on exit (READ DESCRIPTION)",
+			"description": "YOU DON'T NEED THIS UNLESS YOU'RE HAVING ISSUES WITH IT NOT SENDING ON EXIT. If enabled, the \"Closed Geometry Dash\" message uses a blocking request so it is more likely to finish before the process ends. Can freeze the game for up to several tens of seconds in worst case. Not used for any other notification.",
 			"default": false
 		},
 		"player-name": {

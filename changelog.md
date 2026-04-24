@@ -1,9 +1,10 @@
 # 1.0.2
 
-- Removed buggy and useless idle tracker
 - Reworked the codebase
-- Blocking mode only for **Closed Geometry Dash**, all other webhooks use async
-- Webhook: HTTPS check, URL trim, optional `Retry-After` on 429, retry wait off game callback thread
+- Optional blocking mode only for **Closed Geometry Dash**, all other webhooks use async
+- Webhook stuff, HTTPS check, URL trim, optional `Retry-After` on 429, retry wait off game callback thread
+- Removed buggy and useless idle tracker
+- Removed "after {time}" text because it's already in the footer
 
 ## 1.0.1
 

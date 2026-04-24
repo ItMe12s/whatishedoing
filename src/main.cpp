@@ -51,9 +51,8 @@ $execute
                     sendWebhookDirectSync(
                         "Closed Geometry Dash",
                         fmt::format(
-                            "{} exited Geometry Dash after {}.",
-                            playerName,
-                            elapsed
+                            "{} closed Geometry Dash.",
+                            playerName
                         ),
                         embed_color::kGameClose,
                         {},
@@ -63,9 +62,8 @@ $execute
                     sendWebhookDirect(
                         "Closed Geometry Dash",
                         fmt::format(
-                            "{} exited Geometry Dash after {}.",
-                            playerName,
-                            elapsed
+                            "{} closed Geometry Dash.",
+                            playerName
                         ),
                         embed_color::kGameClose,
                         {},

@@ -231,10 +231,9 @@ class $modify(MyPlayLayer, PlayLayer) {
             session.settingKey(),
             session.exitTitle(),
             fmt::format(
-                "{} exited **{}** after {}.",
+                "{} exited **{}**.",
                 playerName,
-                levelName,
-                elapsed
+                levelName
             ),
             session.practice
                 ? session.color()
