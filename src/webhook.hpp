@@ -8,13 +8,21 @@
 struct WebhookField {
     std::string name;
     std::string value;
-    bool inline_field = true;
+    bool inlineField = true;
 };
 
 std::string formatDuration(int totalSeconds);
 std::string formatDurationMs(int64_t totalMs);
 
 void sendWebhookDirect(
+    std::string const& title,
+    std::string const& description,
+    int color,
+    std::vector<WebhookField> const& fields = {},
+    std::string const& footer = ""
+);
+
+void sendWebhookDirectSync(
     std::string const& title,
     std::string const& description,
     int color,

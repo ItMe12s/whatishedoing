@@ -4,9 +4,9 @@
 using namespace geode::prelude;
 
 namespace {
-GameSession g_gameSession;
-LevelSession g_levelSession;
-EditorSession g_editorSession;
+GameSession s_gameSession;
+LevelSession s_levelSession;
+EditorSession s_editorSession;
 } // namespace
 
 int64_t LevelSession::elapsedMilliseconds() const {
@@ -18,7 +18,7 @@ int64_t LevelSession::elapsedMilliseconds() const {
 }
 
 std::string LevelSession::settingKey() const {
-    return "notify-play-level"; // legacy code from 8 hours ago btw, fixing this next update
+    return "notify-play-level";
 }
 
 std::string LevelSession::startTitle() const {
@@ -58,15 +58,15 @@ void EditorSession::reset() {
 }
 
 GameSession& gameSession() {
-    return g_gameSession;
+    return s_gameSession;
 }
 
 LevelSession& levelSession() {
-    return g_levelSession;
+    return s_levelSession;
 }
 
 EditorSession& editorSession() {
-    return g_editorSession;
+    return s_editorSession;
 }
 
 std::string getPlayerName() {

@@ -10,7 +10,7 @@
 	"name": "What is he doing? (Webhook Logger)",
 	"version": "1.0.2",
 	"developer": "imes",
-	"description": "Discord webhook logger for Geometry Dash.",
+	"description": "Sends optional notifications to a Discord webhook you configure. Data goes to Discord, not to the mod author. Clear the URL or turn off toggles to stop sending.",
 	"dependencies": {
 		"geode.node-ids": ">=v1.20.0"
 	},
@@ -30,7 +30,7 @@
 		"webhook-url": {
 			"type": "string",
 			"name": "Webhook URL",
-			"description": "Your Discord webhook URL. Leave empty to disable.",
+			"description": "HTTPS Discord webhook URL. Leave empty to disable all outbound messages.",
 			"default": "",
 			"filter": "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789:/.?=-_"
 		},
@@ -43,27 +43,27 @@
 		"test-webhook": {
 			"type": "bool",
 			"name": "Send Test Webhook",
-			"description": "Toggle on and apply changes to send a test webhook.",
+			"description": "Enable and apply to send a test message (then resets).",
 			"default": false
 		},
 		"max-retries": {
 			"type": "int",
 			"name": "Max Webhook Retries",
-			"description": "How many times to retry sending before giving up.",
+			"description": "How many times to retry sending after a failed attempt.",
 			"default": 3,
 			"min": 0,
 			"max": 10
 		},
 		"blocking-webhook": {
 			"type": "bool",
-			"name": "Blocking Webhook (READ DESCRIPTION)",
-			"description": "Make the webhook HTTP run on the main thread and waits for a response (astronomically worst case it takes up to almost a minute before giving up). Enable this if you really want it to always send when you exit the game. This will be fixed in the next update :frozen:",
+			"name": "Blocking request on exit",
+			"description": "If enabled, the \"Closed Geometry Dash\" message uses a blocking request so it is more likely to finish before the process ends. Can freeze the game for up to several tens of seconds in worst case. Not used for any other notification.",
 			"default": false
 		},
 		"player-name": {
 			"type": "string",
 			"name": "Player Name",
-			"description": "Subject of each Discord message (e.g., 'imes opened Geometry Dash!'). Empty defaults to 'He'.",
+			"description": "Name shown in each message. Empty uses \"He\".",
 			"default": "He"
 		},
 		"notify-title": {
@@ -73,31 +73,31 @@
 		"notify-game-session": {
 			"type": "bool",
 			"name": "Notify on Opening/Exiting Geometry Dash",
-			"description": "Son, why are you reading this?",
+			"description": "Log when the game is opened and closed. Exit time is included in the close message if enabled.",
 			"default": true
 		},
 		"notify-play-level": {
 			"type": "bool",
 			"name": "Notify on Playing/Exiting a Level",
-			"description": "When starting a level (level name, creator, ID) and when exiting a level (includes time in that level).",
+			"description": "Log when a level is started and when the run is exited, including time in the level.",
 			"default": true
 		},
 		"notify-level-complete": {
 			"type": "bool",
 			"name": "Notify on Level Complete",
-			"description": "When a level is completed (includes level info and total time spent on that run).",
+			"description": "Log when a run completes and include time on that run.",
 			"default": true
 		},
 		"notify-new-best": {
 			"type": "bool",
 			"name": "Notify on New Best",
-			"description": "When you get a new best on a level. Hoorayyy!!!!!",
+			"description": "Log when you achieve a new best on a level.",
 			"default": true
 		},
 		"notify-editor": {
 			"type": "bool",
 			"name": "Notify on Opening/Exiting the Editor",
-			"description": "When opening the level editor and when exiting the editor. (duh)",
+			"description": "Log when the editor is opened and when you leave the editor (save and play, save and exit, exit without save).",
 			"default": true
 		}
 	}
