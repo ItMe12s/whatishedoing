@@ -1,9 +1,7 @@
 #include <Geode/Geode.hpp>
 #include <Geode/loader/GameEvent.hpp>
-#include <Geode/modify/MenuLayer.hpp>
 
 #include "embed_colors.hpp"
-#include "idle_tracker.hpp"
 #include "state.hpp"
 #include "webhook.hpp"
 
@@ -15,8 +13,6 @@ $execute
       .listen(
           []
           {
-            registerIdlePolling();
-
             auto &session = gameSession();
             if (session.started)
               return;
@@ -63,14 +59,3 @@ $on_mod(Loaded)
                       embed_color::kTestWebhook);
     Mod::get()->setSettingValue<bool>("test-webhook", false); });
 }
-
-class $modify(MenuLayer)
-{
-  bool init()
-  {
-    if (!MenuLayer::init())
-      return false;
-    markActivity();
-    return true;
-  }
-};

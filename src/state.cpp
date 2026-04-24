@@ -7,9 +7,6 @@ namespace {
 GameSession g_gameSession;
 LevelSession g_levelSession;
 EditorSession g_editorSession;
-
-Clock::time_point g_lastActivityTime = Clock::now();
-uint8_t g_idleThresholdMask = 0;
 } // namespace
 
 int64_t LevelSession::elapsedMilliseconds() const {
@@ -70,19 +67,6 @@ LevelSession& levelSession() {
 
 EditorSession& editorSession() {
     return g_editorSession;
-}
-
-Clock::time_point& lastActivityTime() {
-    return g_lastActivityTime;
-}
-
-uint8_t& idleThresholdMask() {
-    return g_idleThresholdMask;
-}
-
-void markActivity() {
-    g_lastActivityTime = Clock::now();
-    g_idleThresholdMask = 0;
 }
 
 std::string getPlayerName() {

@@ -78,7 +78,6 @@ class $modify(MyPlayLayer, PlayLayer) {
             && session.levelName == levelName;
 
         if (!PlayLayer::init(level, useReplay, dontCreateObjects)) return false;
-        markActivity();
 
         auto creatorName = std::string(level->m_creatorName);
         auto creatorDisplayName = displayCreatorName(creatorName);
@@ -140,7 +139,6 @@ class $modify(MyPlayLayer, PlayLayer) {
     }
 
     void levelComplete() {
-        markActivity();
         syncPlayMode(this);
         auto& pre = levelSession();
         if (!pre.active) {
@@ -180,7 +178,6 @@ class $modify(MyPlayLayer, PlayLayer) {
             return;
         }
 
-        markActivity();
         syncPlayMode(this);
 
         auto playerName = getPlayerName();
@@ -206,7 +203,6 @@ class $modify(MyPlayLayer, PlayLayer) {
 
     void destroyPlayer(PlayerObject* player, GameObject* object) {
         PlayLayer::destroyPlayer(player, object);
-        markActivity();
 
         syncPlayMode(this);
         sendNewBestWebhookIfNeeded(m_level);

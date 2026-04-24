@@ -7,8 +7,6 @@ inline constexpr int kGameClose = 0x992D22;
 inline constexpr int kGameOpen = 0x3498DB;
 inline constexpr int kTestWebhook = 0x2ECC71;
 
-inline constexpr int kIdle = 0x979C9F;
-
 inline constexpr int kEditorOpen = 0xE67E22;
 inline constexpr int kEditorExit = 0xE74C3C;
 

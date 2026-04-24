@@ -8,7 +8,7 @@
 	},
 	"id": "imes.whatishedoing",
 	"name": "What is he doing? (Webhook Logger)",
-	"version": "1.0.1",
+	"version": "1.0.2",
 	"developer": "imes",
 	"description": "Discord webhook logger for Geometry Dash.",
 	"dependencies": {
@@ -98,12 +98,6 @@
 			"type": "bool",
 			"name": "Notify on Opening/Exiting the Editor",
 			"description": "When opening the level editor and when exiting the editor. (duh)",
-			"default": true
-		},
-		"notify-idle": {
-			"type": "bool",
-			"name": "Notify on Idle",
-			"description": "When you've been idle for 5m, 30m, or 2h. Could be useful to call emergency services.",
 			"default": true
 		}
 	}

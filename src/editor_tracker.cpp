@@ -35,7 +35,6 @@ void sendEditorExitWebhook(std::string const& actionTitle) {
 class $modify(MyLevelEditorLayer, LevelEditorLayer) {
     bool init(GJGameLevel* level, bool unk) {
         if (!LevelEditorLayer::init(level, unk)) return false;
-        markActivity();
         levelSession().reset();
 
         auto& session = editorSession();
@@ -59,25 +58,21 @@ class $modify(MyLevelEditorLayer, LevelEditorLayer) {
 
 class $modify(MyEditorPauseLayer, EditorPauseLayer) {
     void onSaveAndPlay(cocos2d::CCObject* sender) {
-        markActivity();
         sendEditorExitWebhook("Save and Play");
         EditorPauseLayer::onSaveAndPlay(sender);
     }
 
     void onSaveAndExit(cocos2d::CCObject* sender) {
-        markActivity();
         sendEditorExitWebhook("Exited the Editor");
         EditorPauseLayer::onSaveAndExit(sender);
     }
 
     void onExitEditor(cocos2d::CCObject* sender) {
-        markActivity();
         sendEditorExitWebhook("Exited the Editor");
         EditorPauseLayer::onExitEditor(sender);
     }
 
     void onExitNoSave(cocos2d::CCObject* sender) {
-        markActivity();
         sendEditorExitWebhook("Exited the Editor");
         EditorPauseLayer::onExitNoSave(sender);
     }

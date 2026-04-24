@@ -47,10 +47,6 @@ GameSession& gameSession();
 LevelSession& levelSession();
 EditorSession& editorSession();
 
-Clock::time_point& lastActivityTime();
-uint8_t& idleThresholdMask();
-
-void markActivity();
 std::string getPlayerName();
 std::string displayLevelName(std::string const& levelName);
 std::string displayCreatorName(std::string const& creatorName);
