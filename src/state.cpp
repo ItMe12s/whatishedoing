@@ -1,8 +1,9 @@
 #include "embed_colors.hpp"
 #include "state.hpp"
 
+#include <Geode/utils/general.hpp>
+#include <Geode/utils/string.hpp>
 #include <cctype>
-#include <charconv>
 #include <unordered_set>
 
 using namespace geode::prelude;
@@ -100,23 +101,15 @@ constexpr char const* kRedactedCreatorName = "-";
 
 std::unordered_set<int> parseLevelIDs(std::string const& raw) {
     std::unordered_set<int> out;
-    size_t i = 0;
-    while (i < raw.size()) {
-        if (!std::isdigit(static_cast<unsigned char>(raw[i]))) {
-            ++i;
-            continue;
-        }
-        size_t const start = i;
-        while (i < raw.size() &&
-               std::isdigit(static_cast<unsigned char>(raw[i]))) {
-            ++i;
-        }
-        int value = 0;
-        auto const* p = raw.data() + start;
-        auto const* e = raw.data() + i;
-        auto res = std::from_chars(p, e, value);
-        if (res.ec == std::errc{}) {
-            out.insert(value);
+    std::string normalized = raw;
+    for (auto& c : normalized) {
+        if (std::isspace(static_cast<unsigned char>(c))) c = ',';
+    }
+    for (auto const& tok : geode::utils::string::split(normalized, ",")) {
+        if (tok.empty()) continue;
+        auto res = geode::utils::numFromString<int>(tok);
+        if (res.isOk()) {
+            out.insert(res.unwrap());
         }
     }
     return out;

@@ -1,4 +1,8 @@
-# 1.0.4
+# 1.0.5
+
+- Use Geode utils for splitting level ID list
+
+## 1.0.4
 
 - Level ID filter with All/Blacklist/Whitelist modes
 
