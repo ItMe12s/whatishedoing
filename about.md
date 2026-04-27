@@ -2,6 +2,13 @@
 
 Show other people what you are doing by automatically sending Discord webhook messages when you take common actions, such as playing a level or opening the editor. More options may be added later :3
 
+## Setup Guide
+
+1. Create a Discord webhook (there's guides on YouTube)
+2. Copy the webhook url
+3. Hop on geode and get to this mod's settings page
+4. Paste the url into the `Webhook URL` text box
+
 ## Currently logged actions
 
 Each of these can be turned on or off in the mod settings under **Notification Toggles**.
@@ -17,5 +24,10 @@ Each of these can be turned on or off in the mod settings under **Notification T
 
 These are under **Other Notification Toggles** and below it.
 
-- **Death** (dying after a certain percentage) (requested by Theitha)
+- **Death** (dying after a configured percentage) (requested by Theitha)
 - **Level ID filter** (All/Blacklist/Whitelist mode for what levels you want to send) (requested by many people)
+
+## Privacy / Security note
+
+- DO NOT LET ANYONE SEE YOUR DISCORD WEBHOOK URL!!!
+- All your data directly goes to Discord, not me
