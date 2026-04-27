@@ -1,5 +1,6 @@
 #include <Geode/binding/GJGameLevel.hpp>
 #include <Geode/modify/PlayLayer.hpp>
+#include <Geode/utils/general.hpp>
 #include <cvolton.level-id-api/include/EditorIDs.hpp>
 #include <vector>
 
@@ -215,7 +216,7 @@ class $modify(MyPlayLayer, PlayLayer) {
             };
             if (display.showLevelID) {
                 fields.push_back(
-                    {"Level ID", std::to_string(levelID), true}
+                    {"Level ID", geode::utils::numToString(levelID), true}
                 );
             }
             sendWebhook(

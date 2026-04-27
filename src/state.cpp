@@ -143,13 +143,12 @@ void setIdInFilterList(int id, bool inList) {
     }
     std::vector<int> sorted(ids.begin(), ids.end());
     std::sort(sorted.begin(), sorted.end());
-    std::string out;
-    for (size_t i = 0; i < sorted.size(); ++i) {
-        if (i > 0) {
-            out += ',';
-        }
-        out += std::to_string(sorted[i]);
+    std::vector<std::string> parts;
+    parts.reserve(sorted.size());
+    for (int const id : sorted) {
+        parts.push_back(geode::utils::numToString(id));
     }
+    auto const out = geode::utils::string::join(parts, ",");
     Mod::get()->setSettingValue<std::string>("level-filter-ids", out);
 }
 

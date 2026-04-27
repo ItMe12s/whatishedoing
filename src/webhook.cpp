@@ -2,10 +2,10 @@
 
 #include <Geode/utils/async.hpp>
 #include <Geode/utils/general.hpp>
+#include <Geode/utils/string.hpp>
 #include <Geode/utils/web.hpp>
 #include <algorithm>
 #include <chrono>
-#include <cctype>
 #include <ctime>
 #include <optional>
 #include <string_view>
@@ -15,24 +15,11 @@ using namespace geode::prelude;
 
 namespace {
 
-void trimInPlace(std::string& s) {
-    while (!s.empty() && std::isspace(
-               static_cast<unsigned char>(s.back()))) {
-        s.pop_back();
-    }
-    size_t i = 0;
-    while (i < s.size() && std::isspace(
-               static_cast<unsigned char>(s[i]))) {
-        ++i;
-    }
-    s.erase(0, i);
-}
-
 // Returns nullopt if the URL is missing or not suitable for a Discord
 // webhook POST.
 std::optional<std::string> normalizeWebhookUrl(std::string const& raw) {
     std::string url = raw;
-    trimInPlace(url);
+    geode::utils::string::trimIP(url);
     if (url.empty()) return std::nullopt;
     if (url.rfind("https://", 0) != 0) {
         log::warn("Webhook URL must start with https://");
