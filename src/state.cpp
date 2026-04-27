@@ -63,7 +63,9 @@ void LevelSession::reset() {
 
 void EditorSession::reset() {
     active = false;
+    levelID = kLevelSessionClearedId;
     levelName.clear();
+    creatorName.clear();
 }
 
 GameSession& gameSession() {

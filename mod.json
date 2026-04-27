@@ -126,7 +126,7 @@
 		"level-filter-mode": {
 			"type": "string",
 			"name": "Level ID Filter Mode",
-			"description": "All = send normally. Blacklist = redact identifying info (level name, creator, ID) for IDs in the list. Whitelist = redact for IDs NOT in the list. Editor and game open/close are never filtered. For local/editor levels, IDs come from the Editor Level ID API mod (same as the in-editor button).",
+			"description": "All = send normally. Blacklist = redact identifying info (level name, creator, ID) for IDs in the list. Whitelist = redact for IDs NOT in the list.",
 			"default": "All",
 			"one-of": [
 				"All",
@@ -144,7 +144,7 @@
 		"suppress-redacted": {
 			"type": "bool",
 			"name": "Don't Send Redacted Messages",
-			"description": "When on, any level message that would otherwise be sent as \"Private level\" (because of the filter mode above) is dropped entirely instead of sent. Use this for full privacy on filtered levels. Affects level start, exit, complete, death, and new best.",
+			"description": "When on, any level message that would otherwise be sent as \"Private level\" (because of the filter mode above) is dropped entirely instead of sent. Use this for full privacy on filtered levels. Affects level start, exit, complete, death, new best, and editor open/exit.",
 			"default": false
 		}
 	}

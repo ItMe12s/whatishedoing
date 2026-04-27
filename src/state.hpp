@@ -38,7 +38,9 @@ struct LevelSession {
 
 struct EditorSession {
     Clock::time_point startTime;
+    int levelID = kLevelSessionClearedId;
     std::string levelName;
+    std::string creatorName;
     bool active = false;
 
     void reset();

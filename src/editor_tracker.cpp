@@ -1,6 +1,9 @@
 #include <Geode/binding/GJGameLevel.hpp>
 #include <Geode/modify/EditorPauseLayer.hpp>
 #include <Geode/modify/LevelEditorLayer.hpp>
+#include <Geode/utils/general.hpp>
+#include <cvolton.level-id-api/include/EditorIDs.hpp>
+#include <vector>
 
 #include "embed_colors.hpp"
 #include "state.hpp"
@@ -15,10 +18,28 @@ void sendEditorExitWebhook(std::string const& actionTitle) {
     if (!session.active) {
         return;
     }
+    auto const display = resolveLevelDisplay(
+        session.levelID,
+        session.levelName,
+        session.creatorName
+    );
+    if (display.redacted &&
+        Mod::get()->getSettingValue<bool>("suppress-redacted")) {
+        session.reset();
+        return;
+    }
     auto const playerName = getPlayerName();
     auto const elapsed =
         formatDuration(secondsSince(session.startTime));
-    auto const levelName = displayLevelName(session.levelName);
+    std::vector<WebhookField> fields = {
+        {"Level", display.levelName, true},
+        {"Creator", display.creatorName, true},
+    };
+    if (display.showLevelID) {
+        fields.push_back(
+            {"Level ID", geode::utils::numToString(session.levelID), true}
+        );
+    }
     sendWebhook(
         "notify-editor",
         actionTitle,
@@ -27,7 +48,7 @@ void sendEditorExitWebhook(std::string const& actionTitle) {
             playerName
         ),
         embed_color::kEditorExit,
-        {{"Level", levelName, true}},
+        fields,
         elapsed
     );
     session.reset();
@@ -46,19 +67,43 @@ class $modify(MyLevelEditorLayer, LevelEditorLayer) {
         levelSession().reset();
         auto& session = editorSession();
         session.startTime = Clock::now();
-        session.levelName = std::string(level->m_levelName);
+        auto const levelID = EditorIDs::getID(level);
+        auto const nameRaw = std::string(level->m_levelName);
+        auto const creatorRaw = std::string(level->m_creatorName);
+        session.levelID = levelID;
+        session.levelName = nameRaw;
+        session.creatorName = displayCreatorName(creatorRaw);
         session.active = true;
-        auto const displayName = displayLevelName(session.levelName);
+        auto const display = resolveLevelDisplay(
+            levelID,
+            nameRaw,
+            creatorRaw
+        );
+        if (display.redacted &&
+            Mod::get()->getSettingValue<bool>("suppress-redacted")) {
+            return true;
+        }
         auto const playerName = getPlayerName();
+        std::vector<WebhookField> fields = {
+            {"Level", display.levelName, true},
+            {"Creator", display.creatorName, true},
+        };
+        if (display.showLevelID) {
+            fields.push_back(
+                {"Level ID", geode::utils::numToString(levelID), true}
+            );
+        }
         sendWebhook(
             "notify-editor",
             "Opened the Editor",
             fmt::format(
-                "{} opened the editor to work on **{}**.",
+                "{} opened the editor to work on **{}** by **{}**.",
                 playerName,
-                displayName
+                display.levelName,
+                display.creatorName
             ),
-            embed_color::kEditorOpen
+            embed_color::kEditorOpen,
+            fields
         );
         return true;
     }

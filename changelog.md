@@ -3,6 +3,7 @@
 - Button to add/remove level ID on info page
 - Local level ID support
 - Don't send redacted messages
+- Level ID filter applies to editor open/exit too
 
 ## 1.0.5
 
