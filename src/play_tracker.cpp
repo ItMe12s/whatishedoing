@@ -76,6 +76,11 @@ void sendDeathWebhookIfNeeded(
         std::string(layer->m_level->m_levelName),
         std::string(layer->m_level->m_creatorName)
     );
+    if (display.redacted &&
+        Mod::get()->getSettingValue<bool>("suppress-redacted")) {
+        session.deathNotified = true;
+        return;
+    }
     sendWebhookDirect(
         "Died",
         fmt::format(
@@ -127,6 +132,10 @@ void sendNewBestWebhookIfNeeded(GJGameLevel* level) {
         std::string(level->m_levelName),
         std::string(level->m_creatorName)
     );
+    if (display.redacted &&
+        Mod::get()->getSettingValue<bool>("suppress-redacted")) {
+        return;
+    }
     sendWebhookDirect(
         "New Best!",
         fmt::format(
@@ -195,6 +204,10 @@ class $modify(MyPlayLayer, PlayLayer) {
                 levelName,
                 creatorName
             );
+            if (display.redacted &&
+                Mod::get()->getSettingValue<bool>("suppress-redacted")) {
+                return true;
+            }
             std::vector<WebhookField> fields = {
                 {"Level", display.levelName, true},
                 {"Creator", display.creatorName, true},
@@ -262,22 +275,26 @@ class $modify(MyPlayLayer, PlayLayer) {
                 : embed_color::kLevelComplete;
         PlayLayer::levelComplete();
         sendNewBestWebhookIfNeeded(m_level);
-        sendWebhook(
-            "notify-level-complete",
-            completeTitle,
-            fmt::format(
-                "{} beat **{}** by **{}**!",
-                playerName,
-                display.levelName,
-                display.creatorName
-            ),
-            completeColor,
-            {
-                {"Level", display.levelName, true},
-                {"Creator", display.creatorName, true},
-            },
-            elapsed
-        );
+        bool const suppress = display.redacted &&
+            Mod::get()->getSettingValue<bool>("suppress-redacted");
+        if (!suppress) {
+            sendWebhook(
+                "notify-level-complete",
+                completeTitle,
+                fmt::format(
+                    "{} beat **{}** by **{}**!",
+                    playerName,
+                    display.levelName,
+                    display.creatorName
+                ),
+                completeColor,
+                {
+                    {"Level", display.levelName, true},
+                    {"Creator", display.creatorName, true},
+                },
+                elapsed
+            );
+        }
         levelSession().reset();
     }
     void onQuit() {
@@ -295,23 +312,27 @@ class $modify(MyPlayLayer, PlayLayer) {
             session.levelName,
             session.creatorName
         );
-        sendWebhook(
-            session.settingKey(),
-            session.exitTitle(),
-            fmt::format(
-                "{} exited **{}**.",
-                playerName,
-                display.levelName
-            ),
-            session.practice
-                ? session.color()
-                : embed_color::kLevelExit,
-            {
-                {"Level", display.levelName, true},
-                {"Creator", display.creatorName, true},
-            },
-            elapsed
-        );
+        bool const suppress = display.redacted &&
+            Mod::get()->getSettingValue<bool>("suppress-redacted");
+        if (!suppress) {
+            sendWebhook(
+                session.settingKey(),
+                session.exitTitle(),
+                fmt::format(
+                    "{} exited **{}**.",
+                    playerName,
+                    display.levelName
+                ),
+                session.practice
+                    ? session.color()
+                    : embed_color::kLevelExit,
+                {
+                    {"Level", display.levelName, true},
+                    {"Creator", display.creatorName, true},
+                },
+                elapsed
+            );
+        }
         session.reset();
         PlayLayer::onQuit();
     }

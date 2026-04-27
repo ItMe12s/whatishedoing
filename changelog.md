@@ -1,4 +1,9 @@
-# 1.0.5
+# 1.0.6
+
+- Local level ID support
+- Don't send redacted messages
+
+## 1.0.5
 
 - Use Geode utils for splitting level ID list
 

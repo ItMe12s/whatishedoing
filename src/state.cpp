@@ -125,11 +125,9 @@ LevelDisplay resolveLevelDisplay(
     LevelDisplay normal{
         displayLevelName(rawLevelName),
         displayCreatorName(rawCreatorName),
-        levelID > 0
+        levelID > 0,
+        false
     };
-    if (levelID <= 0) {
-        return normal;
-    }
     auto const mode =
         Mod::get()->getSettingValue<std::string>("level-filter-mode");
     if (mode != "Blacklist" && mode != "Whitelist") {
@@ -138,12 +136,12 @@ LevelDisplay resolveLevelDisplay(
     auto const idsRaw =
         Mod::get()->getSettingValue<std::string>("level-filter-ids");
     auto const ids = parseLevelIDs(idsRaw);
-    bool const inList = ids.contains(levelID);
+    bool const inList = levelID > 0 && ids.contains(levelID);
     bool const redact =
         (mode == "Blacklist" && inList) ||
         (mode == "Whitelist" && !inList);
     if (!redact) {
         return normal;
     }
-    return LevelDisplay{kRedactedLevelName, kRedactedCreatorName, false};
+    return LevelDisplay{kRedactedLevelName, kRedactedCreatorName, false, true};
 }

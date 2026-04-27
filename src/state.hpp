@@ -57,6 +57,7 @@ struct LevelDisplay {
     std::string levelName;
     std::string creatorName;
     bool        showLevelID;
+    bool        redacted;
 };
 
 LevelDisplay resolveLevelDisplay(
