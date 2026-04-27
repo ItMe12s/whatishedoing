@@ -170,12 +170,19 @@ void sendDeathWebhookIfNeeded(
     session.deathNotified = true;
 }
 
-void sendNewBestWebhookIfNeeded(GJGameLevel* level) {
+void sendNewBestWebhookIfNeeded(PlayLayer* playLayer) {
     if (!Mod::get()->getSettingValue<bool>("notify-new-best")) {
         return;
     }
+    if (!playLayer || !playLayer->m_level) {
+        return;
+    }
+    if (playLayer->m_isTestMode && !playLayer->m_isPracticeMode) {
+        return;
+    }
+    auto* level = playLayer->m_level;
     auto& session = levelSession();
-    if (!session.active || !level) {
+    if (!session.active) {
         return;
     }
     if (session.levelID != EditorIDs::getID(level)) {
@@ -348,32 +355,63 @@ class $modify(MyPlayLayer, PlayLayer) {
             std::string(m_level->m_creatorName)
         );
         auto const playerName = getPlayerName();
-        auto const completeTitle = pre.completeTitle();
         auto const completeColor =
             pre.practice
                 ? pre.color()
                 : embed_color::kLevelComplete;
+        bool const fromStartpos = m_isTestMode && !pre.practice;
         PlayLayer::levelComplete();
-        sendNewBestWebhookIfNeeded(m_level);
+        sendNewBestWebhookIfNeeded(this);
         bool const suppress = display.redacted &&
             Mod::get()->getSettingValue<bool>("suppress-redacted");
         if (!suppress) {
-            sendWebhook(
-                "notify-level-complete",
-                completeTitle,
-                fmt::format(
-                    "{} beat **{}** by **{}**!",
-                    playerName,
-                    display.levelName,
-                    display.creatorName
-                ),
-                completeColor,
-                {
-                    {"Level", display.levelName, true},
-                    {"Creator", display.creatorName, true},
-                },
-                elapsed
-            );
+            if (fromStartpos) {
+                auto const minSeg = static_cast<int>(
+                    Mod::get()->getSettingValue<int64_t>(
+                        "startpos-death-min-progress"
+                    ));
+                int const progress = 100 - pre.startPercent;
+                if (progress >= 0 && progress >= minSeg) {
+                    sendWebhook(
+                        "notify-level-complete",
+                        "Startpos Complete!",
+                        fmt::format(
+                            "{} got a **{}-{}%** run on **{}** by **{}**.",
+                            playerName,
+                            pre.startPercent,
+                            100,
+                            display.levelName,
+                            display.creatorName
+                        ),
+                        completeColor,
+                        {
+                            {"Level", display.levelName, true},
+                            {"Creator", display.creatorName, true},
+                            {"Run",
+                             fmt::format("{}-100%", pre.startPercent),
+                             true},
+                        },
+                        elapsed
+                    );
+                }
+            } else {
+                sendWebhook(
+                    "notify-level-complete",
+                    pre.completeTitle(),
+                    fmt::format(
+                        "{} beat **{}** by **{}**!",
+                        playerName,
+                        display.levelName,
+                        display.creatorName
+                    ),
+                    completeColor,
+                    {
+                        {"Level", display.levelName, true},
+                        {"Creator", display.creatorName, true},
+                    },
+                    elapsed
+                );
+            }
         }
         levelSession().reset();
     }
@@ -430,7 +468,7 @@ class $modify(MyPlayLayer, PlayLayer) {
         }
         PlayLayer::destroyPlayer(player, object);
         syncPlayMode(this);
-        sendNewBestWebhookIfNeeded(m_level);
+        sendNewBestWebhookIfNeeded(this);
         if (trackDeath) {
             sendDeathWebhookIfNeeded(this, pctBefore, bestBefore);
         }

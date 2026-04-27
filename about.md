@@ -16,7 +16,7 @@ Each of these can be turned on or off in the mod settings under **Notification T
 - **Opening or exiting Geometry Dash** (with session time on close)
 - **Starting or exiting a level** (level name, creator, ID when available, and time in the run)
 - **Practice runs** (separate from normal)
-- **Level complete** (run time and level info)
+- **Level complete** (different message for Normal, Practice, and Startpos runs)
 - **New best** (below 100%)
 - **Opening or exiting the editor** (play test and exit paths that leave the editor)
 
@@ -26,7 +26,7 @@ These are under **Other Notification Toggles** and below it.
 
 - **Death** (dying after a configured percentage) (requested by Theitha)
 - **Level ID filter** (All/Blacklist/Whitelist. Online levels use the check beside Favorite and Settings, Editor/local uses the check beside the level info button) (requested by many people)
-- **Startpos progress** (dying in a startpos with mimimum progress percentage) (requested by Manscapers Discord server)
+- **Startpos segment minimum** (minimum percentage from your startpos until death or completion, applies to startpos death messages and **Startpos Complete**, set to 0 to always send) (requested by Manscapers Discord server)
 
 ## Privacy / Security note
 

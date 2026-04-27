@@ -1,4 +1,9 @@
-# 1.0.6
+# 1.0.7
+
+- Startpos level complete message.
+- No **New Best** webhook during normal-mode startpos play (still sends from full runs).
+
+## 1.0.6
 
 - Button to add/remove level ID on info page
 - Local level ID support
