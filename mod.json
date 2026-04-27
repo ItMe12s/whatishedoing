@@ -108,7 +108,7 @@
 		"notify-death": {
 			"type": "bool",
 			"name": "Notify on Death",
-			"description": "Normal mode only. Startpos: minimum segment, start–end percentage line. Skips when New Best already covers that death.",
+			"description": "Normal mode only. Startpos: minimum segment, start-end percentage line. Skips when New Best already covers that death.",
 			"default": false
 		},
 		"death-min-percent": {

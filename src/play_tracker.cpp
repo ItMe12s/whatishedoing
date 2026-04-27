@@ -1,3 +1,4 @@
+#include <Geode/Geode.hpp>
 #include <Geode/binding/GJGameLevel.hpp>
 #include <Geode/modify/PlayLayer.hpp>
 #include <Geode/utils/general.hpp>
@@ -17,6 +18,36 @@ void syncPlayMode(PlayLayer* layer) {
     session.practice = layer->m_isPracticeMode;
 }
 
+void applyStartposSegmentStart(PlayLayer* layer) {
+    if (!layer || !layer->m_level) {
+        return;
+    }
+    if (!layer->m_isTestMode) {
+        return;
+    }
+    if (layer->m_isPracticeMode) {
+        return;
+    }
+    auto& s = levelSession();
+    s.startPercent = static_cast<int>(layer->getCurrentPercent());
+    s.bestNotifiedPercent = s.startPercent;
+}
+
+void queueStartposSegmentStart(PlayLayer* layer) {
+    if (!layer || !layer->m_level || !layer->m_isTestMode) {
+        return;
+    }
+    geode::queueInMainThread([layer] {
+        if (!layer->m_level || !layer->m_isTestMode) {
+            return;
+        }
+        if (!levelSession().active) {
+            return;
+        }
+        applyStartposSegmentStart(layer);
+    });
+}
+
 void reopenLevelSessionIfNeeded(PlayLayer* layer) {
     auto& session = levelSession();
     if (session.active || !layer->m_level) {
@@ -34,6 +65,9 @@ void reopenLevelSessionIfNeeded(PlayLayer* layer) {
         static_cast<int>(level->m_normalPercent.value());
     session.bestNotifiedPercent = session.startPercent;
     syncPlayMode(layer);
+    if (layer->m_isTestMode) {
+        queueStartposSegmentStart(layer);
+    }
 }
 
 void sendDeathWebhookIfNeeded(
@@ -60,10 +94,12 @@ void sendDeathWebhookIfNeeded(
     if (currentPercent >= 100) {
         return;
     }
-    if (currentPercent > bestBefore) {
-        return;
-    }
     bool const fromStartpos = layer->m_isTestMode;
+    if (!fromStartpos && currentPercent > bestBefore) {
+        if (Mod::get()->getSettingValue<bool>("notify-new-best")) {
+            return;
+        }
+    }
     if (fromStartpos) {
         auto const minSeg = static_cast<int>(Mod::get()->getSettingValue<int64_t>(
             "startpos-death-min-progress"
@@ -228,9 +264,16 @@ class $modify(MyPlayLayer, PlayLayer) {
         session.creatorName = creatorDisplayName;
         session.active = true;
         syncPlayMode(this);
-        session.startPercent =
-            static_cast<int>(level->m_normalPercent.value());
-        session.bestNotifiedPercent = session.startPercent;
+        if (m_isTestMode) {
+            session.startPercent =
+                static_cast<int>(level->m_normalPercent.value());
+            session.bestNotifiedPercent = session.startPercent;
+            queueStartposSegmentStart(this);
+        } else {
+            session.startPercent =
+                static_cast<int>(level->m_normalPercent.value());
+            session.bestNotifiedPercent = session.startPercent;
+        }
         auto const playerName = getPlayerName();
         if (!isContinuation) {
             auto const display = resolveLevelDisplay(
@@ -269,6 +312,9 @@ class $modify(MyPlayLayer, PlayLayer) {
     void resetLevel() {
         PlayLayer::resetLevel();
         reopenLevelSessionIfNeeded(this);
+        if (m_isTestMode && m_level) {
+            queueStartposSegmentStart(this);
+        }
         levelSession().deathNotified = false;
     }
     void togglePracticeMode(bool practiceMode) {
@@ -377,7 +423,7 @@ class $modify(MyPlayLayer, PlayLayer) {
         int bestBefore = 0;
         if (trackDeath) {
             pctBefore =
-                static_cast<int>(PlayLayer::getCurrentPercent());
+                static_cast<int>(this->getCurrentPercent());
             bestBefore = m_level
                 ? static_cast<int>(m_level->m_newNormalPercent2.value())
                 : 0;
