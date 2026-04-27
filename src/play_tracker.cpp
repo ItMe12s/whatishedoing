@@ -55,6 +55,9 @@ void sendDeathWebhookIfNeeded(
     if (layer->m_level->isPlatformer()) {
         return;
     }
+    if (layer->m_isTestMode) {
+        return;
+    }
     if (currentPercent <= 0) {
         return;
     }

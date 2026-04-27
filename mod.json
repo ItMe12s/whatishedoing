@@ -107,7 +107,7 @@
 		"notify-death": {
 			"type": "bool",
 			"name": "Notify on Death",
-			"description": "Log when you die in a level. Only sent in normal mode (not practice), only above the minimum percent below, and never when the death is itself a new best (the New Best message covers that case).",
+			"description": "Log when you die in a level. Only sent in normal mode (not practice or startpos), only above the minimum percent below, and never when the death is itself a new best (the New Best message covers that case).",
 			"default": false
 		},
 		"death-min-percent": {
