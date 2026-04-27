@@ -26,6 +26,7 @@ These are under **Other Notification Toggles** and below it.
 
 - **Death** (dying after a configured percentage) (requested by Theitha)
 - **Level ID filter** (All/Blacklist/Whitelist. Online levels use the check beside Favorite and Settings, Editor/local uses the check beside the level info button) (requested by many people)
+- **Startpos progress** (dying in a startpos, with mimimum progress percentage)
 
 ## Privacy / Security note
 

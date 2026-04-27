@@ -108,14 +108,22 @@
 		"notify-death": {
 			"type": "bool",
 			"name": "Notify on Death",
-			"description": "Log when you die in a level. Only sent in normal mode (not practice or startpos), only above the minimum percent below, and never when the death is itself a new best (the New Best message covers that case).",
+			"description": "Normal mode only. Startpos: minimum segment, start–end percentage line. Skips when New Best already covers that death.",
 			"default": false
 		},
 		"death-min-percent": {
 			"type": "int",
 			"name": "Minimum Death Percent",
 			"description": "Skip death notifications below this percent. Set to 0 to send every death.",
-			"default": 50,
+			"default": 40,
+			"min": 0,
+			"max": 99
+		},
+		"startpos-death-min-progress": {
+			"type": "int",
+			"name": "Minimum Startpos Progress Percent",
+			"description": "Minimum percentage points from that start to your death. Set to 0 to send every startpos death.",
+			"default": 20,
 			"min": 0,
 			"max": 99
 		},

@@ -54,9 +54,6 @@ void sendDeathWebhookIfNeeded(
     if (layer->m_level->isPlatformer()) {
         return;
     }
-    if (layer->m_isTestMode) {
-        return;
-    }
     if (currentPercent <= 0) {
         return;
     }
@@ -66,11 +63,25 @@ void sendDeathWebhookIfNeeded(
     if (currentPercent > bestBefore) {
         return;
     }
-    auto const minPct = static_cast<int>(
-        Mod::get()->getSettingValue<int64_t>("death-min-percent")
-    );
-    if (currentPercent < minPct) {
-        return;
+    bool const fromStartpos = layer->m_isTestMode;
+    if (fromStartpos) {
+        auto const minSeg = static_cast<int>(Mod::get()->getSettingValue<int64_t>(
+            "startpos-death-min-progress"
+        ));
+        int const progress = currentPercent - session.startPercent;
+        if (progress < 0) {
+            return;
+        }
+        if (progress < minSeg) {
+            return;
+        }
+    } else {
+        auto const minPct = static_cast<int>(
+            Mod::get()->getSettingValue<int64_t>("death-min-percent")
+        );
+        if (currentPercent < minPct) {
+            return;
+        }
     }
     auto const playerName = getPlayerName();
     auto const display = resolveLevelDisplay(
@@ -83,22 +94,43 @@ void sendDeathWebhookIfNeeded(
         session.deathNotified = true;
         return;
     }
-    sendWebhookDirect(
-        "Died",
-        fmt::format(
-            "{} died at **{}%** on **{}** by **{}**.",
-            playerName,
-            currentPercent,
-            display.levelName,
-            display.creatorName
-        ),
-        embed_color::kDeath,
-        {
-            {"Level", display.levelName, true},
-            {"Creator", display.creatorName, true},
-            {"Percent", fmt::format("{}%", currentPercent), true},
-        }
-    );
+    if (fromStartpos) {
+        int const startPct = session.startPercent;
+        sendWebhookDirect(
+            "Died",
+            fmt::format(
+                "{} got a **{}-{}%** run on **{}** by **{}**.",
+                playerName,
+                startPct,
+                currentPercent,
+                display.levelName,
+                display.creatorName
+            ),
+            embed_color::kDeath,
+            {
+                {"Level", display.levelName, true},
+                {"Creator", display.creatorName, true},
+                {"Run", fmt::format("{}-{}%", startPct, currentPercent), true},
+            }
+        );
+    } else {
+        sendWebhookDirect(
+            "Died",
+            fmt::format(
+                "{} died at **{}%** on **{}** by **{}**.",
+                playerName,
+                currentPercent,
+                display.levelName,
+                display.creatorName
+            ),
+            embed_color::kDeath,
+            {
+                {"Level", display.levelName, true},
+                {"Creator", display.creatorName, true},
+                {"Percent", fmt::format("{}%", currentPercent), true},
+            }
+        );
+    }
     session.deathNotified = true;
 }
 
