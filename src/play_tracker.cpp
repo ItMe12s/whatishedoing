@@ -39,9 +39,6 @@ void sendDeathWebhookIfNeeded(
     int currentPercent,
     int bestBefore
 ) {
-    if (!Mod::get()->getSettingValue<bool>("notify-death")) {
-        return;
-    }
     auto& session = levelSession();
     if (!session.active || !layer || !layer->m_level) {
         return;
