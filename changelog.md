@@ -1,4 +1,8 @@
-# 1.0.3
+# 1.0.4
+
+- Level ID filter All/Blacklist/Whitelist
+
+## 1.0.3
 
 - Send death message after a minimum percentage
 

@@ -18,3 +18,4 @@ Each of these can be turned on or off in the mod settings under **Notification T
 These are under **Other Notification Toggles**.
 
 - **Death** (dying after a certain percentage) (requested by Theitha)
+- **Level ID filter** (All/Blacklist/Whitelist mode for what level you want to send)

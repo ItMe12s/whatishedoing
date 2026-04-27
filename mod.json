@@ -8,7 +8,7 @@
 	},
 	"id": "imes.whatishedoing",
 	"name": "What is he doing? (Webhook Logger)",
-	"version": "1.0.3",
+	"version": "1.0.4",
 	"developer": "imes",
 	"description": "Sends optional notifications to a Discord webhook you configure. Data goes to Discord, not to the mod author. Clear the URL or turn off toggles to stop sending.",
 	"dependencies": {
@@ -117,6 +117,28 @@
 			"default": 50,
 			"min": 0,
 			"max": 99
+		},
+		"filter-title": {
+			"type": "title",
+			"name": "Level ID Filter"
+		},
+		"level-filter-mode": {
+			"type": "string",
+			"name": "Level ID Filter Mode",
+			"description": "All = send normally. Blacklist = redact identifying info (level name, creator, ID) for IDs in the list. Whitelist = redact for IDs NOT in the list. Editor and game open/close are never filtered. Unknown / unsaved levels (no ID) are never filtered.",
+			"default": "All",
+			"one-of": [
+				"All",
+				"Blacklist",
+				"Whitelist"
+			]
+		},
+		"level-filter-ids": {
+			"type": "string",
+			"name": "Level IDs (comma-separated)",
+			"description": "Example: 123,456,890. Whitespace ignored. Non-numeric tokens ignored.",
+			"default": "",
+			"filter": "0123456789, "
 		}
 	}
 }

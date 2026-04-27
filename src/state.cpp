@@ -1,6 +1,10 @@
 #include "embed_colors.hpp"
 #include "state.hpp"
 
+#include <cctype>
+#include <charconv>
+#include <unordered_set>
+
 using namespace geode::prelude;
 
 namespace {
@@ -87,4 +91,66 @@ int secondsSince(Clock::time_point const& start) {
     return static_cast<int>(
         std::chrono::duration_cast<std::chrono::seconds>(Clock::now() - start).count()
     );
+}
+
+namespace {
+
+constexpr char const* kRedactedLevelName = "Private level";
+constexpr char const* kRedactedCreatorName = "-";
+
+std::unordered_set<int> parseLevelIDs(std::string const& raw) {
+    std::unordered_set<int> out;
+    size_t i = 0;
+    while (i < raw.size()) {
+        if (!std::isdigit(static_cast<unsigned char>(raw[i]))) {
+            ++i;
+            continue;
+        }
+        size_t const start = i;
+        while (i < raw.size() &&
+               std::isdigit(static_cast<unsigned char>(raw[i]))) {
+            ++i;
+        }
+        int value = 0;
+        auto const* p = raw.data() + start;
+        auto const* e = raw.data() + i;
+        auto res = std::from_chars(p, e, value);
+        if (res.ec == std::errc{}) {
+            out.insert(value);
+        }
+    }
+    return out;
+}
+
+} // namespace
+
+LevelDisplay resolveLevelDisplay(
+    int levelID,
+    std::string const& rawLevelName,
+    std::string const& rawCreatorName
+) {
+    LevelDisplay normal{
+        displayLevelName(rawLevelName),
+        displayCreatorName(rawCreatorName),
+        levelID > 0
+    };
+    if (levelID <= 0) {
+        return normal;
+    }
+    auto const mode =
+        Mod::get()->getSettingValue<std::string>("level-filter-mode");
+    if (mode != "Blacklist" && mode != "Whitelist") {
+        return normal;
+    }
+    auto const idsRaw =
+        Mod::get()->getSettingValue<std::string>("level-filter-ids");
+    auto const ids = parseLevelIDs(idsRaw);
+    bool const inList = ids.contains(levelID);
+    bool const redact =
+        (mode == "Blacklist" && inList) ||
+        (mode == "Whitelist" && !inList);
+    if (!redact) {
+        return normal;
+    }
+    return LevelDisplay{kRedactedLevelName, kRedactedCreatorName, false};
 }

@@ -71,23 +71,24 @@ void sendDeathWebhookIfNeeded(
         return;
     }
     auto const playerName = getPlayerName();
-    auto const levelName =
-        displayLevelName(std::string(layer->m_level->m_levelName));
-    auto const creatorName =
-        displayCreatorName(std::string(layer->m_level->m_creatorName));
+    auto const display = resolveLevelDisplay(
+        layer->m_level->m_levelID.value(),
+        std::string(layer->m_level->m_levelName),
+        std::string(layer->m_level->m_creatorName)
+    );
     sendWebhookDirect(
         "Died",
         fmt::format(
             "{} died at **{}%** on **{}** by **{}**.",
             playerName,
             currentPercent,
-            levelName,
-            creatorName
+            display.levelName,
+            display.creatorName
         ),
         embed_color::kDeath,
         {
-            {"Level", levelName, true},
-            {"Creator", creatorName, true},
+            {"Level", display.levelName, true},
+            {"Creator", display.creatorName, true},
             {"Percent", fmt::format("{}%", currentPercent), true},
         }
     );
@@ -121,23 +122,24 @@ void sendNewBestWebhookIfNeeded(GJGameLevel* level) {
     }
     session.bestNotifiedPercent = currentBest;
     auto const playerName = getPlayerName();
-    auto const levelName =
-        displayLevelName(std::string(level->m_levelName));
-    auto const creatorName =
-        displayCreatorName(std::string(level->m_creatorName));
+    auto const display = resolveLevelDisplay(
+        level->m_levelID.value(),
+        std::string(level->m_levelName),
+        std::string(level->m_creatorName)
+    );
     sendWebhookDirect(
         "New Best!",
         fmt::format(
             "{} reached a new best of **{}%** on **{}** by **{}**.",
             playerName,
             currentBest,
-            levelName,
-            creatorName
+            display.levelName,
+            display.creatorName
         ),
         embed_color::kNewBest,
         {
-            {"Level", levelName, true},
-            {"Creator", creatorName, true},
+            {"Level", display.levelName, true},
+            {"Creator", display.creatorName, true},
             {"Best", fmt::format("{}%", currentBest), true},
         }
     );
@@ -169,7 +171,6 @@ class $modify(MyPlayLayer, PlayLayer) {
         }
         auto const creatorName = std::string(level->m_creatorName);
         auto const creatorDisplayName = displayCreatorName(creatorName);
-        auto const displayName = displayLevelName(levelName);
         if (isContinuation) {
             session.accumulated +=
                 std::chrono::duration_cast<Milliseconds>(
@@ -189,11 +190,16 @@ class $modify(MyPlayLayer, PlayLayer) {
         session.bestNotifiedPercent = session.startPercent;
         auto const playerName = getPlayerName();
         if (!isContinuation) {
+            auto const display = resolveLevelDisplay(
+                levelID,
+                levelName,
+                creatorName
+            );
             std::vector<WebhookField> fields = {
-                {"Level", displayName, true},
-                {"Creator", creatorDisplayName, true},
+                {"Level", display.levelName, true},
+                {"Creator", display.creatorName, true},
             };
-            if (levelID > 0) {
+            if (display.showLevelID) {
                 fields.push_back(
                     {"Level ID", std::to_string(levelID), true}
                 );
@@ -204,8 +210,8 @@ class $modify(MyPlayLayer, PlayLayer) {
                 fmt::format(
                     "{} is now playing **{}** by **{}**.",
                     playerName,
-                    displayName,
-                    creatorDisplayName
+                    display.levelName,
+                    display.creatorName
                 ),
                 session.color(),
                 fields
@@ -243,12 +249,11 @@ class $modify(MyPlayLayer, PlayLayer) {
         }
         auto const elapsed =
             formatDurationMs(pre.elapsedMilliseconds());
-        auto const levelName =
-            displayLevelName(std::string(m_level->m_levelName));
-        auto const creatorName =
-            displayCreatorName(
-                std::string(m_level->m_creatorName)
-            );
+        auto const display = resolveLevelDisplay(
+            m_level->m_levelID.value(),
+            std::string(m_level->m_levelName),
+            std::string(m_level->m_creatorName)
+        );
         auto const playerName = getPlayerName();
         auto const completeTitle = pre.completeTitle();
         auto const completeColor =
@@ -263,13 +268,13 @@ class $modify(MyPlayLayer, PlayLayer) {
             fmt::format(
                 "{} beat **{}** by **{}**!",
                 playerName,
-                levelName,
-                creatorName
+                display.levelName,
+                display.creatorName
             ),
             completeColor,
             {
-                {"Level", levelName, true},
-                {"Creator", creatorName, true},
+                {"Level", display.levelName, true},
+                {"Creator", display.creatorName, true},
             },
             elapsed
         );
@@ -285,23 +290,25 @@ class $modify(MyPlayLayer, PlayLayer) {
         auto const playerName = getPlayerName();
         auto const elapsed =
             formatDurationMs(session.elapsedMilliseconds());
-        auto const levelName = displayLevelName(session.levelName);
-        auto const creatorName =
-            displayCreatorName(session.creatorName);
+        auto const display = resolveLevelDisplay(
+            session.levelID,
+            session.levelName,
+            session.creatorName
+        );
         sendWebhook(
             session.settingKey(),
             session.exitTitle(),
             fmt::format(
                 "{} exited **{}**.",
                 playerName,
-                levelName
+                display.levelName
             ),
             session.practice
                 ? session.color()
                 : embed_color::kLevelExit,
             {
-                {"Level", levelName, true},
-                {"Creator", creatorName, true},
+                {"Level", display.levelName, true},
+                {"Creator", display.creatorName, true},
             },
             elapsed
         );

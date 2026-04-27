@@ -52,3 +52,15 @@ std::string getPlayerName();
 std::string displayLevelName(std::string const& levelName);
 std::string displayCreatorName(std::string const& creatorName);
 int secondsSince(Clock::time_point const& start);
+
+struct LevelDisplay {
+    std::string levelName;
+    std::string creatorName;
+    bool        showLevelID;
+};
+
+LevelDisplay resolveLevelDisplay(
+    int levelID,
+    std::string const& rawLevelName,
+    std::string const& rawCreatorName
+);
