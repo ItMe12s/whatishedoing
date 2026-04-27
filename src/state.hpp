@@ -65,3 +65,6 @@ LevelDisplay resolveLevelDisplay(
     std::string const& rawLevelName,
     std::string const& rawCreatorName
 );
+
+bool isIdInFilterList(int id);
+void setIdInFilterList(int id, bool inList);

@@ -1,5 +1,6 @@
 #include <Geode/binding/GJGameLevel.hpp>
 #include <Geode/modify/PlayLayer.hpp>
+#include <cvolton.level-id-api/include/EditorIDs.hpp>
 #include <vector>
 
 #include "embed_colors.hpp"
@@ -21,7 +22,7 @@ void reopenLevelSessionIfNeeded(PlayLayer* layer) {
         return;
     }
     auto* level = layer->m_level;
-    session.levelID = level->m_levelID.value();
+    session.levelID = EditorIDs::getID(level);
     session.levelName = std::string(level->m_levelName);
     session.creatorName =
         displayCreatorName(std::string(level->m_creatorName));
@@ -72,7 +73,7 @@ void sendDeathWebhookIfNeeded(
     }
     auto const playerName = getPlayerName();
     auto const display = resolveLevelDisplay(
-        layer->m_level->m_levelID.value(),
+        EditorIDs::getID(layer->m_level),
         std::string(layer->m_level->m_levelName),
         std::string(layer->m_level->m_creatorName)
     );
@@ -108,7 +109,7 @@ void sendNewBestWebhookIfNeeded(GJGameLevel* level) {
     if (!session.active || !level) {
         return;
     }
-    if (session.levelID != level->m_levelID.value()) {
+    if (session.levelID != EditorIDs::getID(level)) {
         return;
     }
     if (session.practice) {
@@ -128,7 +129,7 @@ void sendNewBestWebhookIfNeeded(GJGameLevel* level) {
     session.bestNotifiedPercent = currentBest;
     auto const playerName = getPlayerName();
     auto const display = resolveLevelDisplay(
-        level->m_levelID.value(),
+        EditorIDs::getID(level),
         std::string(level->m_levelName),
         std::string(level->m_creatorName)
     );
@@ -165,7 +166,7 @@ class $modify(MyPlayLayer, PlayLayer) {
         std::string const levelName =
             level ? std::string(level->m_levelName) : "";
         int const levelID = level
-            ? level->m_levelID.value()
+            ? EditorIDs::getID(level)
             : kLevelSessionClearedId;
         bool const isContinuation = level
             && session.active
@@ -263,7 +264,7 @@ class $modify(MyPlayLayer, PlayLayer) {
         auto const elapsed =
             formatDurationMs(pre.elapsedMilliseconds());
         auto const display = resolveLevelDisplay(
-            m_level->m_levelID.value(),
+            EditorIDs::getID(m_level),
             std::string(m_level->m_levelName),
             std::string(m_level->m_creatorName)
         );

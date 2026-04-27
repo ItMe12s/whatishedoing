@@ -3,8 +3,11 @@
 
 #include <Geode/utils/general.hpp>
 #include <Geode/utils/string.hpp>
+#include <algorithm>
 #include <cctype>
+#include <string>
 #include <unordered_set>
+#include <vector>
 
 using namespace geode::prelude;
 
@@ -116,6 +119,39 @@ std::unordered_set<int> parseLevelIDs(std::string const& raw) {
 }
 
 } // namespace
+
+bool isIdInFilterList(int id) {
+    if (id <= 0) {
+        return false;
+    }
+    auto const raw =
+        Mod::get()->getSettingValue<std::string>("level-filter-ids");
+    return parseLevelIDs(raw).contains(id);
+}
+
+void setIdInFilterList(int id, bool inList) {
+    if (id <= 0) {
+        return;
+    }
+    auto const raw =
+        Mod::get()->getSettingValue<std::string>("level-filter-ids");
+    auto ids = parseLevelIDs(raw);
+    if (inList) {
+        ids.insert(id);
+    } else {
+        ids.erase(id);
+    }
+    std::vector<int> sorted(ids.begin(), ids.end());
+    std::sort(sorted.begin(), sorted.end());
+    std::string out;
+    for (size_t i = 0; i < sorted.size(); ++i) {
+        if (i > 0) {
+            out += ',';
+        }
+        out += std::to_string(sorted[i]);
+    }
+    Mod::get()->setSettingValue<std::string>("level-filter-ids", out);
+}
 
 LevelDisplay resolveLevelDisplay(
     int levelID,

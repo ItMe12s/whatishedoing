@@ -12,6 +12,7 @@
 	"developer": "imes",
 	"description": "Sends optional notifications based on your actions to a Discord webhook you configure.",
 	"dependencies": {
+		"cvolton.level-id-api": ">=v2.0.0",
 		"geode.node-ids": ">=v1.20.0"
 	},
 	"links": {
@@ -125,7 +126,7 @@
 		"level-filter-mode": {
 			"type": "string",
 			"name": "Level ID Filter Mode",
-			"description": "All = send normally. Blacklist = redact identifying info (level name, creator, ID) for IDs in the list. Whitelist = redact for IDs NOT in the list. Editor and game open/close are never filtered. Local / unsaved levels (no online ID) are treated as not-in-list: under Whitelist they are redacted, under Blacklist they send normally.",
+			"description": "All = send normally. Blacklist = redact identifying info (level name, creator, ID) for IDs in the list. Whitelist = redact for IDs NOT in the list. Editor and game open/close are never filtered. For local/editor levels, IDs come from the Editor Level ID API mod (same as the in-editor button).",
 			"default": "All",
 			"one-of": [
 				"All",
@@ -136,7 +137,7 @@
 		"level-filter-ids": {
 			"type": "string",
 			"name": "Level IDs (comma-separated)",
-			"description": "Example: 123,456,890. Whitespace ignored. Non-numeric tokens ignored. I recommend making a list in Notepad (or any other note app) and copy pasting it here. It will automatically filter out text for you too (e.g. \"1 Stereo Madness, 2 Back On Track\" -> \"1, 2\").",
+			"description": "Example: 123,456,890. Whitespace ignored. Non-numeric tokens ignored. Local levels use Editor Level ID API ids (not RobTop online ids). I recommend making a list in Notepad (or any other note app) and copy pasting it here. It will automatically filter out text for you too (e.g. \"1 Stereo Madness, 2 Back On Track\" -> \"1, 2\").",
 			"default": "",
 			"filter": "0123456789, "
 		},
