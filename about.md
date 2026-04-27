@@ -13,9 +13,9 @@ Each of these can be turned on or off in the mod settings under **Notification T
 - **New best** (below 100%)
 - **Opening or exiting the editor** (play test and exit paths that leave the editor)
 
-## Off by default
+## Off by default / Community features
 
-These are under **Other Notification Toggles**.
+These are under **Other Notification Toggles** and below it.
 
 - **Death** (dying after a certain percentage) (requested by Theitha)
-- **Level ID filter** (All/Blacklist/Whitelist mode for what level you want to send)
+- **Level ID filter** (All/Blacklist/Whitelist mode for what levels you want to send) (requested by many people)

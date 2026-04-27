@@ -1,6 +1,6 @@
 # 1.0.4
 
-- Level ID filter All/Blacklist/Whitelist
+- Level ID filter with All/Blacklist/Whitelist modes
 
 ## 1.0.3
 
