@@ -85,7 +85,7 @@ struct WIHEditLevelLayer : Modify<WIHEditLevelLayer, EditLevelLayer> {
         if (!btn) {
             return true;
         }
-        btn->setID("whatishedoing-filter-level-button");
+        btn->setID("filter-level-button-editor"_spr);
         btn->setZOrder(1);
         menu->addChild(btn);
         // I hope no one adds an extra button other than death tracker's one https://github.com/abb2k/death-tracker/blob/main/src/hooks/DTEditLevelLayer.cpp

@@ -137,7 +137,7 @@
 		"level-filter-ids": {
 			"type": "string",
 			"name": "Level IDs (comma-separated)",
-			"description": "Example: 123,456,890. Whitespace ignored. Non-numeric tokens ignored. Local levels use Editor Level ID API ids (not RobTop online ids). I recommend making a list in Notepad (or any other note app) and copy pasting it here. It will automatically filter out text for you too (e.g. \"1 Stereo Madness, 2 Back On Track\" -> \"1, 2\").",
+			"description": "Use the toggle button on the level info page to add/remove levels. Or do it the old way by making a list in a note app and copy pasting it here. It will automatically filter out text for you too (e.g. \"1 Stereo Madness, 2 Back On Track\" -> \"1, 2\").",
 			"default": "",
 			"filter": "0123456789, "
 		},

@@ -105,18 +105,17 @@ struct WIHLevelInfoLayer : Modify<WIHLevelInfoLayer, LevelInfoLayer> {
             return true;
         }
         m_fields->m_wihFilterButton = btn;
-        btn->setID("whatishedoing-filter-level-button-levelinfo");
+        btn->setID("filter-level-button-levelinfo"_spr);
         btn->setZOrder(1);
         btn->setVisible(false);
         otherMenu->addChild(btn);
 
-        // https://github.com/abb2k/death-tracker/blob/main/src/hooks/DTLevelInfoLayer.cpp
-        // plus 2x button width on X so it clears death-tracker’s same-row slot
+        // very shit positioning, no one will ever do it like this except me
         float const step = btn->getScaledContentSize().width;
         if (fav->isVisible()) {
             btn->setPosition(
                 ccp(
-                    fav->getPositionX() + 2.f * step,
+                    fav->getPositionX() + 1.f * step,
                     settingsBtn->getPositionY()
                 )
             );

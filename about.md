@@ -25,7 +25,7 @@ Each of these can be turned on or off in the mod settings under **Notification T
 These are under **Other Notification Toggles** and below it.
 
 - **Death** (dying after a configured percentage) (requested by Theitha)
-- **Level ID filter** (All/Blacklist/Whitelist mode for what levels you want to send) (requested by many people)
+- **Level ID filter** (All/Blacklist/Whitelist modes. Online levels use the check beside Favorite and Settings, Editor/Local levels use the check beside the level info button) (requested by many people)
 
 ## Privacy / Security note
 

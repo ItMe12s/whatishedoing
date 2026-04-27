@@ -1,5 +1,6 @@
 # 1.0.6
 
+- Button to add/remove level ID on info page
 - Local level ID support
 - Don't send redacted messages
 
