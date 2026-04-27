@@ -1,16 +1,17 @@
 #include <cvolton.level-id-api/include/EditorIDs.hpp>
 #include <Geode/Geode.hpp>
-#include <Geode/modify/EditLevelLayer.hpp>
+#include <Geode/modify/LevelInfoLayer.hpp>
 #include <Geode/binding/CCMenuItemSpriteExtra.hpp>
 
 #include "state.hpp"
 
 using namespace geode::prelude;
 
-struct WIHEditLevelLayer : Modify<WIHEditLevelLayer, EditLevelLayer> {
+struct WIHLevelInfoLayer : Modify<WIHLevelInfoLayer, LevelInfoLayer> {
     struct Fields {
         cocos2d::CCSprite* m_wihFilterInList = nullptr;
         cocos2d::CCSprite* m_wihFilterNotInList = nullptr;
+        CCMenuItemSpriteExtra* m_wihFilterButton = nullptr;
     };
 
     void wihRefreshFilterIcon() {
@@ -47,18 +48,36 @@ struct WIHEditLevelLayer : Modify<WIHEditLevelLayer, EditLevelLayer> {
         wihRefreshFilterIcon();
     }
 
-    bool init(GJGameLevel* level) {
-        if (!EditLevelLayer::init(level)) {
+    void wihCheckIfPlayVisible(float) {
+        if (!m_fields->m_wihFilterButton) {
+            return;
+        }
+        if (m_playBtnMenu && m_playBtnMenu->isVisible()) {
+            m_fields->m_wihFilterButton->setVisible(true);
+            this->unschedule(
+                schedule_selector(WIHLevelInfoLayer::wihCheckIfPlayVisible)
+            );
+        }
+    }
+
+    bool init(GJGameLevel* level, bool challenge) {
+        if (!LevelInfoLayer::init(level, challenge)) {
             return false;
         }
-        auto* menu = this->getChildByID("info-button-menu");
-        if (!menu) {
+        auto* otherMenu = this->getChildByID("other-menu");
+        auto* settingsMenu = this->getChildByID("settings-menu");
+        if (!otherMenu || !settingsMenu) {
             return true;
         }
-        auto* infoBtn = menu->getChildByID("info-button");
-        if (!infoBtn) {
+        auto* fav = otherMenu->getChildByID("favorite-button");
+        if (!fav) {
             return true;
         }
+        auto* settingsBtn = settingsMenu->getChildByID("settings-button");
+        if (!settingsBtn) {
+            return true;
+        }
+
         auto* base = cocos2d::CCSprite::createWithSpriteFrameName("GJ_plainBtn_001.png");
         if (!base) {
             return true;
@@ -80,24 +99,37 @@ struct WIHEditLevelLayer : Modify<WIHEditLevelLayer, EditLevelLayer> {
             base,
             nullptr,
             this,
-            menu_selector(WIHEditLevelLayer::onWihFilterToggle)
+            menu_selector(WIHLevelInfoLayer::onWihFilterToggle)
         );
         if (!btn) {
             return true;
         }
-        btn->setID("whatishedoing-filter-level-button");
+        m_fields->m_wihFilterButton = btn;
+        btn->setID("whatishedoing-filter-level-button-levelinfo");
         btn->setZOrder(1);
-        menu->addChild(btn);
-        // I hope no one adds an extra button other than death tracker's one https://github.com/abb2k/death-tracker/blob/main/src/hooks/DTEditLevelLayer.cpp
+        btn->setVisible(false);
+        otherMenu->addChild(btn);
+
+        // https://github.com/abb2k/death-tracker/blob/main/src/hooks/DTLevelInfoLayer.cpp
+        // plus 2x button width on X so it clears death-tracker’s same-row slot
         float const step = btn->getScaledContentSize().width;
-        btn->setPosition(
-            ccp(
-                infoBtn->getPositionX() + 2.f * step,
-                infoBtn->getPositionY() + 1.f * step
-            )
-        );
+        if (fav->isVisible()) {
+            btn->setPosition(
+                ccp(
+                    fav->getPositionX() + 2.f * step,
+                    settingsBtn->getPositionY()
+                )
+            );
+        } else {
+            cocos2d::CCPoint const p = fav->getPosition();
+            btn->setPosition(ccp(p.x + 2.f * step, p.y));
+        }
+
         wihRefreshFilterIcon();
-        menu->updateLayout();
+        otherMenu->updateLayout();
+        this->schedule(
+            schedule_selector(WIHLevelInfoLayer::wihCheckIfPlayVisible)
+        );
         return true;
     }
 };
