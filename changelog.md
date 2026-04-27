@@ -1,7 +1,7 @@
 # 1.0.7
 
-- Startpos level complete message.
-- No **New Best** webhook during normal-mode startpos play (still sends from full runs).
+- Startpos level complete message
+- Fix **New Best** webhook during startpos bug
 
 ## 1.0.6
 
