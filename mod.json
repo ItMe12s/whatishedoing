@@ -8,7 +8,7 @@
 	},
 	"id": "imes.whatishedoing",
 	"name": "What is he doing? (Webhook Logger)",
-	"version": "1.0.2",
+	"version": "1.0.3",
 	"developer": "imes",
 	"description": "Sends optional notifications to a Discord webhook you configure. Data goes to Discord, not to the mod author. Clear the URL or turn off toggles to stop sending.",
 	"dependencies": {
@@ -68,7 +68,7 @@
 		},
 		"notify-title": {
 			"type": "title",
-			"name": "Notification Toggles"
+			"name": "Main Notification Toggles"
 		},
 		"notify-game-session": {
 			"type": "bool",
@@ -99,6 +99,24 @@
 			"name": "Notify on Opening/Exiting the Editor",
 			"description": "Log when the editor is opened and when you leave the editor (save and play, save and exit, exit without save).",
 			"default": true
+		},
+		"other-notify-title": {
+			"type": "title",
+			"name": "Other Notification Toggles"
+		},
+		"notify-death": {
+			"type": "bool",
+			"name": "Notify on Death",
+			"description": "Log when you die in a level. Only sent in normal mode (not practice), only above the minimum percent below, and never when the death is itself a new best (the New Best message covers that case).",
+			"default": false
+		},
+		"death-min-percent": {
+			"type": "int",
+			"name": "Minimum Death Percent",
+			"description": "Skip death notifications below this percent. Set to 0 to send every death.",
+			"default": 50,
+			"min": 0,
+			"max": 99
 		}
 	}
 }

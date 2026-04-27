@@ -1,4 +1,8 @@
-# 1.0.2
+# 1.0.3
+
+- Send death message after a minimum percentage
+
+## 1.0.2
 
 - Reworked the codebase
 - Optional blocking mode only for **Closed Geometry Dash**, all other webhooks use async

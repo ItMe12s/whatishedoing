@@ -12,3 +12,9 @@ Each of these can be turned on or off in the mod settings under **Notification T
 - **Level complete** (run time and level info)
 - **New best** (below 100%)
 - **Opening or exiting the editor** (play test and exit paths that leave the editor)
+
+## Off by default
+
+These are under **Other Notification Toggles**.
+
+- **Death** (dying after a certain percentage) (requested by Theitha)

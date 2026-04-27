@@ -12,6 +12,7 @@ inline constexpr int kEditorExit = 0xE74C3C;
 inline constexpr int kNewBest = 0xF1C40F;
 inline constexpr int kLevelComplete = 0xFFD700;
 inline constexpr int kLevelExit = 0xED4245;
+inline constexpr int kDeath = 0xC0392B;
 
 inline constexpr int kPlayPractice = 0x95A5A6;
 inline constexpr int kPlayNormal = 0x57F287;

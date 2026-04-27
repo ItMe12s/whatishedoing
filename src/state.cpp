@@ -50,6 +50,7 @@ void LevelSession::reset() {
     practice = false;
     startPercent = 0;
     bestNotifiedPercent = 0;
+    deathNotified = false;
 }
 
 void EditorSession::reset() {

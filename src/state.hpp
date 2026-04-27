@@ -25,6 +25,7 @@ struct LevelSession {
     bool practice = false;
     int startPercent = 0;
     int bestNotifiedPercent = 0;
+    bool deathNotified = false;
 
     int64_t elapsedMilliseconds() const;
     std::string settingKey() const;

@@ -34,6 +34,66 @@ void reopenLevelSessionIfNeeded(PlayLayer* layer) {
     syncPlayMode(layer);
 }
 
+void sendDeathWebhookIfNeeded(
+    PlayLayer* layer,
+    int currentPercent,
+    int bestBefore
+) {
+    if (!Mod::get()->getSettingValue<bool>("notify-death")) {
+        return;
+    }
+    auto& session = levelSession();
+    if (!session.active || !layer || !layer->m_level) {
+        return;
+    }
+    if (session.deathNotified) {
+        return;
+    }
+    if (session.practice) {
+        return;
+    }
+    if (layer->m_level->isPlatformer()) {
+        return;
+    }
+    if (currentPercent <= 0) {
+        return;
+    }
+    if (currentPercent >= 100) {
+        return;
+    }
+    if (currentPercent > bestBefore) {
+        return;
+    }
+    auto const minPct = static_cast<int>(
+        Mod::get()->getSettingValue<int64_t>("death-min-percent")
+    );
+    if (currentPercent < minPct) {
+        return;
+    }
+    auto const playerName = getPlayerName();
+    auto const levelName =
+        displayLevelName(std::string(layer->m_level->m_levelName));
+    auto const creatorName =
+        displayCreatorName(std::string(layer->m_level->m_creatorName));
+    sendWebhookDirect(
+        "Died",
+        fmt::format(
+            "{} died at **{}%** on **{}** by **{}**.",
+            playerName,
+            currentPercent,
+            levelName,
+            creatorName
+        ),
+        embed_color::kDeath,
+        {
+            {"Level", levelName, true},
+            {"Creator", creatorName, true},
+            {"Percent", fmt::format("{}%", currentPercent), true},
+        }
+    );
+    session.deathNotified = true;
+}
+
 void sendNewBestWebhookIfNeeded(GJGameLevel* level) {
     if (!Mod::get()->getSettingValue<bool>("notify-new-best")) {
         return;
@@ -156,6 +216,7 @@ class $modify(MyPlayLayer, PlayLayer) {
     void resetLevel() {
         PlayLayer::resetLevel();
         reopenLevelSessionIfNeeded(this);
+        levelSession().deathNotified = false;
     }
     void togglePracticeMode(bool practiceMode) {
         PlayLayer::togglePracticeMode(practiceMode);
@@ -248,8 +309,14 @@ class $modify(MyPlayLayer, PlayLayer) {
         PlayLayer::onQuit();
     }
     void destroyPlayer(PlayerObject* player, GameObject* object) {
+        int const pctBefore =
+            static_cast<int>(PlayLayer::getCurrentPercent());
+        int const bestBefore = m_level
+            ? static_cast<int>(m_level->m_newNormalPercent2.value())
+            : 0;
         PlayLayer::destroyPlayer(player, object);
         syncPlayMode(this);
         sendNewBestWebhookIfNeeded(m_level);
+        sendDeathWebhookIfNeeded(this, pctBefore, bestBefore);
     }
 };
