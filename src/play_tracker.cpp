@@ -312,14 +312,22 @@ class $modify(MyPlayLayer, PlayLayer) {
         PlayLayer::onQuit();
     }
     void destroyPlayer(PlayerObject* player, GameObject* object) {
-        int const pctBefore =
-            static_cast<int>(PlayLayer::getCurrentPercent());
-        int const bestBefore = m_level
-            ? static_cast<int>(m_level->m_newNormalPercent2.value())
-            : 0;
+        bool const trackDeath =
+            Mod::get()->getSettingValue<bool>("notify-death");
+        int pctBefore = 0;
+        int bestBefore = 0;
+        if (trackDeath) {
+            pctBefore =
+                static_cast<int>(PlayLayer::getCurrentPercent());
+            bestBefore = m_level
+                ? static_cast<int>(m_level->m_newNormalPercent2.value())
+                : 0;
+        }
         PlayLayer::destroyPlayer(player, object);
         syncPlayMode(this);
         sendNewBestWebhookIfNeeded(m_level);
-        sendDeathWebhookIfNeeded(this, pctBefore, bestBefore);
+        if (trackDeath) {
+            sendDeathWebhookIfNeeded(this, pctBefore, bestBefore);
+        }
     }
 };
