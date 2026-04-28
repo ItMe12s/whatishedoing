@@ -1,4 +1,8 @@
-# 1.0.7
+# 1.1.0
+
+- Profile manager page
+
+## 1.0.7
 
 - Startpos level complete message
 - Fix **New Best** webhook during startpos bug

@@ -8,6 +8,7 @@
 #include <Geode/binding/CCMenuItemSpriteExtra.hpp>
 #include <Geode/ui/Layout.hpp>
 #include <Geode/utils/cocos.hpp>
+#include <string>
 #include <vector>
 
 using namespace geode::prelude;
@@ -19,6 +20,8 @@ namespace {
 constexpr float kPopupWidth = 380.f;
 constexpr float kPopupHeight = 290.f;
 constexpr float kRowHeight = 22.f;
+constexpr float kButtonRowGap = 6.f;
+constexpr float kLoadButtonLeftGapExtra = 10.f;
 
 constexpr int kNameLabelTag = 1000;
 constexpr int kStatusTag = 1001;
@@ -45,6 +48,10 @@ CCMenu* findMenu(CCNode* row) {
     return static_cast<CCMenu*>(row->getChildren()->lastObject());
 }
 
+std::string profileNodeId(std::string const& local) {
+    return fmt::format("{}/{}", Mod::get()->getID(), local);
+}
+
 } // namespace
 
 cocos2d::CCNode* ProfileManagerPopup::makeSlotRow(
@@ -56,12 +63,14 @@ cocos2d::CCNode* ProfileManagerPopup::makeSlotRow(
     auto* row = CCNode::create();
     row->setContentSize({width, kRowHeight});
     row->setUserObject(CCInteger::create(static_cast<int>(idx)));
+    row->setID(profileNodeId(fmt::format("profile-slot-row-{}", idx)));
 
     auto* label = CCLabelBMFont::create(slot.c_str(), "bigFont.fnt");
     label->setScale(.45f);
     label->setAnchorPoint({0.f, .5f});
     label->setPosition({4.f, kRowHeight * .5f});
     label->setTag(kNameLabelTag);
+    label->setID(profileNodeId(fmt::format("profile-slot-{}-name", idx)));
     row->addChild(label);
 
     auto* status = CCLabelBMFont::create("", "chatFont.fnt");
@@ -69,6 +78,7 @@ cocos2d::CCNode* ProfileManagerPopup::makeSlotRow(
     status->setAnchorPoint({0.f, .5f});
     status->setPosition({124.f, kRowHeight * .5f});
     status->setTag(kStatusTag);
+    status->setID(profileNodeId(fmt::format("profile-slot-{}-status", idx)));
     row->addChild(status);
 
     auto* menu = CCMenu::create();
@@ -76,6 +86,13 @@ cocos2d::CCNode* ProfileManagerPopup::makeSlotRow(
     menu->setContentSize({width, kRowHeight});
     menu->setAnchorPoint({0.f, 0.f});
     menu->setPosition({0.f, 0.f});
+    menu->setLayout(
+        RowLayout::create()
+            ->setGap(kButtonRowGap)
+            ->setAxisAlignment(AxisAlignment::End)
+            ->setCrossAxisAlignment(AxisAlignment::Center)
+    );
+    menu->setID(profileNodeId(fmt::format("profile-slot-{}-actions", idx)));
     row->addChild(menu);
 
     auto* renameSpr = ButtonSprite::create(
@@ -91,7 +108,7 @@ cocos2d::CCNode* ProfileManagerPopup::makeSlotRow(
         menu_selector(ProfileManagerPopup::onRenameSlot)
     );
     renameBtn->setUserObject(CCInteger::create(static_cast<int>(idx)));
-    renameBtn->setPosition({width - 168.f, kRowHeight * .5f});
+    renameBtn->setID(profileNodeId(fmt::format("profile-slot-{}-rename", idx)));
     menu->addChild(renameBtn);
 
     auto* clearSpr = ButtonSprite::create(
@@ -107,8 +124,8 @@ cocos2d::CCNode* ProfileManagerPopup::makeSlotRow(
         menu_selector(ProfileManagerPopup::onClearSlot)
     );
     clearBtn->setUserObject(CCInteger::create(static_cast<int>(idx)));
-    clearBtn->setPosition({width - 116.f, kRowHeight * .5f});
     clearBtn->setTag(kClearButtonTag);
+    clearBtn->setID(profileNodeId(fmt::format("profile-slot-{}-delete", idx)));
     menu->addChild(clearBtn);
 
     auto* saveSpr = ButtonSprite::create(
@@ -124,8 +141,8 @@ cocos2d::CCNode* ProfileManagerPopup::makeSlotRow(
         menu_selector(ProfileManagerPopup::onSaveSlot)
     );
     saveBtn->setUserObject(CCInteger::create(static_cast<int>(idx)));
-    saveBtn->setPosition({width - 64.f, kRowHeight * .5f});
     saveBtn->setTag(kSaveButtonTag);
+    saveBtn->setID(profileNodeId(fmt::format("profile-slot-{}-save", idx)));
     menu->addChild(saveBtn);
 
     auto* loadSpr = ButtonSprite::create(
@@ -141,9 +158,16 @@ cocos2d::CCNode* ProfileManagerPopup::makeSlotRow(
         menu_selector(ProfileManagerPopup::onLoadSlot)
     );
     loadBtn->setUserObject(CCInteger::create(static_cast<int>(idx)));
-    loadBtn->setPosition({width - 18.f, kRowHeight * .5f});
     loadBtn->setTag(kLoadButtonTag);
+    loadBtn->setLayoutOptions(
+        AxisLayoutOptions::create()->setPrevGap(
+            kButtonRowGap + kLoadButtonLeftGapExtra
+        )
+    );
+    loadBtn->setID(profileNodeId(fmt::format("profile-slot-{}-load", idx)));
     menu->addChild(loadBtn);
+
+    menu->updateLayout();
 
     refreshRow(row, idx);
     return row;
@@ -177,11 +201,13 @@ bool ProfileManagerPopup::init() {
         return false;
     }
     this->setTitle("Profile Manager");
+    this->setID("profile-manager-popup"_spr);
 
     float const innerWidth = kPopupWidth - 30.f;
     float const listH = kRowHeight * kSlotCount + 8.f;
 
     auto* listBg = CCLayerColor::create({0, 0, 0, 75});
+    listBg->setID("profile-manager-list-bg"_spr);
     listBg->setContentSize({innerWidth, listH});
     listBg->ignoreAnchorPointForPosition(false);
     listBg->setAnchorPoint({.5f, .5f});
@@ -192,11 +218,12 @@ bool ProfileManagerPopup::init() {
     );
 
     auto* hint = CCLabelBMFont::create(
-        "Save: snapshot of last-applied settings.  Load: applies on next launch.",
+        "Save: snapshot of last-applied settings. | Load: close this menu and apply your settings.",
         "chatFont.fnt"
     );
     hint->setScale(.55f);
     hint->setColor(ccc3(180, 180, 180));
+    hint->setID("profile-manager-hint"_spr);
     m_mainLayer->addChildAtPosition(
         hint,
         Anchor::Center,
@@ -233,13 +260,34 @@ CCNode* rowFromButton(CCObject* sender) {
 void ProfileManagerPopup::onSaveSlot(cocos2d::CCObject* sender) {
     auto const idx = indexFromSender(sender);
     auto const slot = slotNameAt(idx);
-    snapshotIntoSlot(slot);
-    refreshRow(rowFromButton(sender), idx);
-    Notification::create(
-        fmt::format("Saved to {}", slot),
-        NotificationIcon::Success,
-        1.5f
-    )->show();
+    auto* row = rowFromButton(sender);
+    bool const hadData = slotIsFilled(slot);
+
+    createQuickPopup(
+        "Save Profile",
+        hadData
+            ? fmt::format(
+                  "Overwrite saved data in <cy>{}</c> with a snapshot of "
+                  "your current (last-applied) settings?",
+                  slot
+              )
+            : fmt::format(
+                  "Save a snapshot of your current settings to <cy>{}</c>?",
+                  slot
+              ),
+        "Cancel",
+        "Save",
+        [this, idx, row, slot](FLAlertLayer*, bool ok) {
+            if (!ok) return;
+            snapshotIntoSlot(slot);
+            refreshRow(row, idx);
+            Notification::create(
+                fmt::format("Saved to {}", slot),
+                NotificationIcon::Success,
+                1.5f
+            )->show();
+        }
+    );
 }
 
 void ProfileManagerPopup::onLoadSlot(cocos2d::CCObject* sender) {
@@ -294,13 +342,27 @@ void ProfileManagerPopup::onClearSlot(cocos2d::CCObject* sender) {
     auto const slot = slotNameAt(idx);
     if (!slotIsFilled(slot)) return;
 
-    clearSlot(slot);
-    refreshRow(rowFromButton(sender), idx);
-    Notification::create(
-        fmt::format("Cleared {}", slot),
-        NotificationIcon::Info,
-        1.5f
-    )->show();
+    auto* row = rowFromButton(sender);
+    createQuickPopup(
+        "Delete Profile",
+        fmt::format(
+            "Permanently clear saved profile <cy>{}</c>? This cannot be "
+            "undone.",
+            slot
+        ),
+        "Cancel",
+        "Delete",
+        [this, idx, row, slot](FLAlertLayer*, bool ok) {
+            if (!ok) return;
+            clearSlot(slot);
+            refreshRow(row, idx);
+            Notification::create(
+                fmt::format("Cleared {}", slot),
+                NotificationIcon::Info,
+                1.5f
+            )->show();
+        }
+    );
 }
 
 void ProfileManagerPopup::onRenameSlot(cocos2d::CCObject* sender) {

@@ -23,6 +23,7 @@ protected:
         float width
     ) {
         if (!SettingNodeV3::init(setting, width)) return false;
+        this->setID("settings-profile-manager-node"_spr);
 
         auto spr = ButtonSprite::create(
             "Manage Profiles",
@@ -36,6 +37,7 @@ protected:
             this,
             menu_selector(ProfileManagerSettingNode::onManage)
         );
+        m_button->setID("settings-profile-manager-open"_spr);
         auto* menu = this->getButtonMenu();
         menu->addChildAtPosition(m_button, Anchor::Center);
         menu->updateLayout();

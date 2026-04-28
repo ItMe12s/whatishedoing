@@ -21,6 +21,7 @@ bool RenamePopup::init(
     m_onAccept = std::move(onAccept);
 
     this->setTitle("Rename Profile");
+    this->setID("profile-rename-popup"_spr);
 
     m_input = TextInput::create(220.f, "Profile name", "chatFont.fnt");
     m_input->setMaxCharCount(32);
@@ -31,6 +32,7 @@ bool RenamePopup::init(
         " _-.,!?'()"
     );
     m_input->setString(std::move(current));
+    m_input->setID("profile-rename-input"_spr);
     m_mainLayer->addChildAtPosition(m_input, Anchor::Center, ccp(0.f, 5.f));
 
     auto cancelSpr = ButtonSprite::create(
@@ -45,10 +47,11 @@ bool RenamePopup::init(
         this,
         menu_selector(RenamePopup::onClose)
     );
+    cancelBtn->setID("profile-rename-cancel"_spr);
     m_buttonMenu->addChildAtPosition(
         cancelBtn,
         Anchor::Bottom,
-        ccp(-50.f, 22.f)
+        ccp(-50.f, 30.f)
     );
 
     auto saveSpr = ButtonSprite::create(
@@ -63,10 +66,11 @@ bool RenamePopup::init(
         this,
         menu_selector(RenamePopup::onAccept)
     );
+    saveBtn->setID("profile-rename-apply"_spr);
     m_buttonMenu->addChildAtPosition(
         saveBtn,
         Anchor::Bottom,
-        ccp(50.f, 22.f)
+        ccp(50.f, 30.f)
     );
 
     return true;

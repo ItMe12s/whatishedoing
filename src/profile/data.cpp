@@ -1,8 +1,8 @@
 #include "data.hpp"
 
 #include <Geode/Geode.hpp>
+#include <Geode/utils/string.hpp>
 #include <algorithm>
-#include <cctype>
 #include <cstdint>
 
 using namespace geode::prelude;
@@ -60,13 +60,6 @@ void storeNames(std::array<std::string, kSlotCount> const& names) {
         arr.push(n);
     }
     Mod::get()->setSavedValue<matjson::Value>(kProfileNamesKey, arr);
-}
-
-std::string trim(std::string s) {
-    auto isspace = [](unsigned char c) { return std::isspace(c); };
-    while (!s.empty() && isspace(s.front())) s.erase(s.begin());
-    while (!s.empty() && isspace(s.back())) s.pop_back();
-    return s;
 }
 
 matjson::Value snapshotCurrentSettings() {
@@ -173,7 +166,7 @@ Result<> renameSlot(std::size_t idx, std::string newName) {
     if (idx >= kSlotCount) {
         return Err("Invalid slot index");
     }
-    auto trimmed = trim(std::move(newName));
+    auto trimmed = geode::utils::string::trim(std::move(newName));
     if (trimmed.empty()) {
         return Err("Name cannot be empty");
     }

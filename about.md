@@ -2,12 +2,22 @@
 
 Show other people what you are doing by automatically sending Discord webhook messages when you take common actions, such as playing a level or opening the editor. More options may be added later :3
 
-## Setup Guide
+## Setup guide
 
 1. Create a Discord webhook (there's guides on YouTube)
 2. Copy the webhook url
 3. Hop on geode and get to this mod's settings page
 4. Paste the url into the `Webhook URL` text box
+
+## Profile manager
+
+On this mod's settings page, open **Manage Profiles** to work with up to 10 named slots.
+Don't forget to save a profile if you add/remove a level from the ID filer!
+
+- **Save** stores a snapshot of your **last-applied** mod settings into that slot.
+- **Load** applies a saved slot and closes open settings popups so values apply cleanly.
+- **Rename** changes the slot's display name.
+- **Delete** clears saved data for that slot.
 
 ## Currently logged actions
 
