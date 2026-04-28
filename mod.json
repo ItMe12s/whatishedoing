@@ -24,6 +24,15 @@
 		"utility"
 	],
 	"settings": {
+		"profile-title": {
+			"type": "title",
+			"name": "Profile"
+		},
+		"profile-manager": {
+			"type": "custom:profile-manager",
+			"name": "Profile Manager",
+			"description": "Save and load full setting snapshots across 10 slots. Loading applies on next Geometry Dash launch."
+		},
 		"webhook-title": {
 			"type": "title",
 			"name": "Discord Webhook"

@@ -2,6 +2,8 @@
 #include <Geode/loader/GameEvent.hpp>
 
 #include "embed_colors.hpp"
+#include "profile/data.hpp"
+#include "profile/setting.hpp"
 #include "state.hpp"
 #include "webhook.hpp"
 
@@ -77,6 +79,11 @@ $execute
 
 $on_mod(Loaded)
 {
+    (void)Mod::get()->registerCustomSettingType(
+        "profile-manager",
+        &profile::ProfileManagerSettingV3::parse
+    );
+
     listenForSettingChanges<bool>("test-webhook", [](bool enabled) {
         if (!enabled) {
             return;
