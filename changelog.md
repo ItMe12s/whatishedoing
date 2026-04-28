@@ -1,6 +1,11 @@
-# 1.1.1
+# 1.1.2
+
+- Actually close the Geode settings page after loading a profile
+
+## 1.1.1
 
 - Profile manager uses button setting (with **Manage Profiles**) and other UI/UX + internal improvements
+- Loading a profile closes Geode settings without the extra unsaved-changes discard prompt
 
 ## 1.1.0
 

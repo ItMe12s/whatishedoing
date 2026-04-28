@@ -4,13 +4,16 @@
 #include "rename_popup.hpp"
 
 #include <Geode/Geode.hpp>
+#include <Geode/loader/Loader.hpp>
 #include <Geode/binding/ButtonSprite.hpp>
 #include <Geode/binding/CCMenuItemSpriteExtra.hpp>
 #include <Geode/binding/FLAlertLayer.hpp>
 #include <Geode/ui/Layout.hpp>
+#include <Geode/ui/Popup.hpp>
 #include <Geode/utils/cocos.hpp>
+#include <Geode/utils/string.hpp>
+#include <functional>
 #include <string>
-#include <vector>
 
 using namespace geode::prelude;
 
@@ -67,6 +70,50 @@ CCMenu* findMenu(CCNode* row) {
 
 std::string profileNodeId(std::string const& local) {
     return fmt::format("{}/{}", Mod::get()->getID(), local);
+}
+
+cocos2d::CCNode* findGeodeSettingSearchInputDescendant(cocos2d::CCNode* root) {
+    return cocos::findFirstChildRecursive<CCNode>(
+        root,
+        [](CCNode* c) {
+            return string::contains(
+                std::string_view(c->getID()),
+                "search-input"
+            );
+        }
+    );
+}
+
+geode::Popup* findGeodeBaseSettingsPopup(cocos2d::CCScene* scene) {
+    if (!scene) return nullptr;
+
+    geode::Popup* found = nullptr;
+    std::function<void(cocos2d::CCNode*)> dfs =
+        [&](cocos2d::CCNode* node) {
+            if (found || !node) return;
+            if (auto* p = typeinfo_cast<geode::Popup*>(node)) {
+                if (findGeodeSettingSearchInputDescendant(p)) {
+                    found = p;
+                    return;
+                }
+            }
+            auto* ch = node->getChildren();
+            if (!ch) return;
+            for (auto* child : CCArrayExt<CCNode*>(ch)) {
+                dfs(child);
+            }
+        };
+    dfs(scene);
+    return found;
+}
+
+// Same teardown as Popup::onClose (cuz it's protected), cannot qualify-call on unrelated Popup. I'm heart broken bro </3
+void closeGeodePopupLikePopup(geode::Popup* p) {
+    if (!p) return;
+    geode::Popup::CloseEvent(p).send();
+    p->setKeypadEnabled(false);
+    p->setTouchEnabled(false);
+    p->removeFromParent();
 }
 
 } // namespace
@@ -325,7 +372,7 @@ void ProfileManagerPopup::onLoadSlot(cocos2d::CCObject* sender) {
         ),
         "Cancel",
         "Load",
-        [slot](FLAlertLayer*, bool ok) {
+        [slot, this](FLAlertLayer*, bool ok) {
             if (!ok) return;
             if (!applyProfileNow(slot)) {
                 Notification::create(
@@ -337,23 +384,17 @@ void ProfileManagerPopup::onLoadSlot(cocos2d::CCObject* sender) {
             }
             auto* scene =
                 CCDirector::sharedDirector()->getRunningScene();
-            std::vector<FLAlertLayer*> toClose;
-            if (scene && scene->getChildren()) {
-                for (auto* child : CCArrayExt<CCNode*>(
-                         scene->getChildren())) {
-                    if (auto* alert = typeinfo_cast<FLAlertLayer*>(child)) {
-                        toClose.push_back(alert);
-                    }
-                }
+            if (auto* settings = findGeodeBaseSettingsPopup(scene)) {
+                closeGeodePopupLikePopup(settings);
             }
-            for (auto* p : toClose) {
-                p->keyBackClicked();
-            }
-            Notification::create(
-                fmt::format("Loaded {}", slot),
-                NotificationIcon::Success,
-                1.5f
-            )->show();
+            Loader::get()->queueInMainThread([slot]() {
+                Notification::create(
+                    fmt::format("Loaded {}", slot),
+                    NotificationIcon::Success,
+                    1.5f
+                )->show();
+            });
+            this->Popup::onClose(nullptr);
         }
     );
 }
