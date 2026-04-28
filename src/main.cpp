@@ -1,9 +1,10 @@
 #include <Geode/Geode.hpp>
 #include <Geode/loader/GameEvent.hpp>
+#include <Geode/loader/SettingV3.hpp>
 
 #include "embed_colors.hpp"
 #include "profile/data.hpp"
-#include "profile/setting.hpp"
+#include "profile/popup.hpp"
 #include "state.hpp"
 #include "webhook.hpp"
 
@@ -79,10 +80,15 @@ $execute
 
 $on_mod(Loaded)
 {
-    (void)Mod::get()->registerCustomSettingType(
-        "profile-manager",
-        &profile::ProfileManagerSettingV3::parse
-    );
+    ButtonSettingPressedEventV3(Mod::get(), "profile-manager")
+        .listen(
+            [](std::string_view buttonKey) {
+                if (buttonKey == "manage") {
+                    profile::ProfileManagerPopup::create()->show();
+                }
+            }
+        )
+        .leak();
 
     listenForSettingChanges<bool>("test-webhook", [](bool enabled) {
         if (!enabled) {

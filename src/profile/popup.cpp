@@ -6,6 +6,7 @@
 #include <Geode/Geode.hpp>
 #include <Geode/binding/ButtonSprite.hpp>
 #include <Geode/binding/CCMenuItemSpriteExtra.hpp>
+#include <Geode/binding/FLAlertLayer.hpp>
 #include <Geode/ui/Layout.hpp>
 #include <Geode/utils/cocos.hpp>
 #include <string>
@@ -22,20 +23,36 @@ constexpr float kPopupHeight = 290.f;
 constexpr float kRowHeight = 22.f;
 constexpr float kButtonRowGap = 6.f;
 constexpr float kActionsMenuRightPadding = 10.f;
+constexpr float kNameLabelMaxWidth = 110.f;
+constexpr float kNameLabelScale = .45f;
+constexpr float kNameLabelMinScale = .05f;
 
 constexpr int kNameLabelTag = 1000;
 constexpr int kStatusTag = 1001;
 constexpr int kLoadButtonTag = 1002;
 constexpr int kSaveButtonTag = 1003;
 constexpr int kClearButtonTag = 1004;
+constexpr int kRenameButtonTag = 1005;
 
-void styleButton(CCMenuItemSpriteExtra* btn, bool enabled) {
+void ensureRenameSaveButton(CCMenuItemSpriteExtra* btn) {
     if (!btn) return;
-    btn->setEnabled(enabled);
+    btn->setEnabled(true);
+    btn->setOpacity(255);
     if (auto* spr = typeinfo_cast<CCSprite*>(btn->getNormalImage())) {
-        spr->setColor(enabled ? ccc3(255, 255, 255) : ccc3(120, 120, 120));
-        spr->setOpacity(enabled ? 255 : 160);
+        spr->setOpacity(255);
     }
+}
+
+void styleLoadDeleteButton(CCMenuItemSpriteExtra* btn, bool slotFilled) {
+    if (!btn) return;
+    btn->setEnabled(slotFilled);
+    GLubyte const alpha = slotFilled ? 255 : 128;
+    if (auto* spr = typeinfo_cast<CCSprite*>(btn->getNormalImage())) {
+        spr->setCascadeOpacityEnabled(true);
+        spr->setOpacity(alpha);
+    }
+    btn->setCascadeOpacityEnabled(true);
+    btn->setOpacity(alpha);
 }
 
 CCMenuItemSpriteExtra* findItemByTag(CCMenu* menu, int tag) {
@@ -66,7 +83,7 @@ cocos2d::CCNode* ProfileManagerPopup::makeSlotRow(
     row->setID(profileNodeId(fmt::format("profile-slot-row-{}", idx)));
 
     auto* label = CCLabelBMFont::create(slot.c_str(), "bigFont.fnt");
-    label->setScale(.45f);
+    label->setScale(kNameLabelScale);
     label->setAnchorPoint({0.f, .5f});
     label->setPosition({4.f, kRowHeight * .5f});
     label->setTag(kNameLabelTag);
@@ -76,7 +93,7 @@ cocos2d::CCNode* ProfileManagerPopup::makeSlotRow(
     auto* status = CCLabelBMFont::create("", "chatFont.fnt");
     status->setScale(.55f);
     status->setAnchorPoint({0.f, .5f});
-    status->setPosition({124.f, kRowHeight * .5f});
+    status->setPosition({120.f, kRowHeight * .5f});
     status->setTag(kStatusTag);
     status->setID(profileNodeId(fmt::format("profile-slot-{}-status", idx)));
     row->addChild(status);
@@ -109,6 +126,7 @@ cocos2d::CCNode* ProfileManagerPopup::makeSlotRow(
         menu_selector(ProfileManagerPopup::onRenameSlot)
     );
     renameBtn->setUserObject(CCInteger::create(static_cast<int>(idx)));
+    renameBtn->setTag(kRenameButtonTag);
     renameBtn->setID(profileNodeId(fmt::format("profile-slot-{}-rename", idx)));
     menu->addChild(renameBtn);
 
@@ -179,6 +197,11 @@ void ProfileManagerPopup::refreshRow(
     if (auto* label = static_cast<CCLabelBMFont*>(
             row->getChildByTag(kNameLabelTag))) {
         label->setString(slot.c_str());
+        label->limitLabelWidth(
+            kNameLabelMaxWidth,
+            kNameLabelScale,
+            kNameLabelMinScale
+        );
     }
     if (auto* status = static_cast<CCLabelBMFont*>(
             row->getChildByTag(kStatusTag))) {
@@ -188,8 +211,10 @@ void ProfileManagerPopup::refreshRow(
         );
     }
     auto* menu = findMenu(row);
-    styleButton(findItemByTag(menu, kLoadButtonTag), filled);
-    styleButton(findItemByTag(menu, kClearButtonTag), filled);
+    ensureRenameSaveButton(findItemByTag(menu, kRenameButtonTag));
+    styleLoadDeleteButton(findItemByTag(menu, kClearButtonTag), filled);
+    ensureRenameSaveButton(findItemByTag(menu, kSaveButtonTag));
+    styleLoadDeleteButton(findItemByTag(menu, kLoadButtonTag), filled);
 }
 
 bool ProfileManagerPopup::init() {
@@ -312,17 +337,17 @@ void ProfileManagerPopup::onLoadSlot(cocos2d::CCObject* sender) {
             }
             auto* scene =
                 CCDirector::sharedDirector()->getRunningScene();
-            std::vector<CCNode*> toClose;
+            std::vector<FLAlertLayer*> toClose;
             if (scene && scene->getChildren()) {
                 for (auto* child : CCArrayExt<CCNode*>(
                          scene->getChildren())) {
-                    if (typeinfo_cast<geode::Popup*>(child)) {
-                        toClose.push_back(child);
+                    if (auto* alert = typeinfo_cast<FLAlertLayer*>(child)) {
+                        toClose.push_back(alert);
                     }
                 }
             }
             for (auto* p : toClose) {
-                p->removeFromParentAndCleanup(true);
+                p->keyBackClicked();
             }
             Notification::create(
                 fmt::format("Loaded {}", slot),

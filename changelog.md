@@ -1,4 +1,8 @@
-# 1.1.0
+# 1.1.1
+
+- Profile manager uses button setting (with **Manage Profiles**) and other UI/UX + internal improvements
+
+## 1.1.0
 
 - Profile manager
 
