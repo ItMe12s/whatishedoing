@@ -31,7 +31,7 @@
 		"profile-manager": {
 			"type": "custom:profile-manager",
 			"name": "Profile Manager",
-			"description": "Save and load full setting snapshots across 10 slots. Loading applies on next Geometry Dash launch."
+			"description": "Save and load snapshots of mod settings across 10 renamed slots. Loading applies values immediately and closes open settings popups so they stick."
 		},
 		"webhook-title": {
 			"type": "title",

@@ -21,7 +21,7 @@ constexpr float kPopupWidth = 380.f;
 constexpr float kPopupHeight = 290.f;
 constexpr float kRowHeight = 22.f;
 constexpr float kButtonRowGap = 6.f;
-constexpr float kLoadButtonLeftGapExtra = 10.f;
+constexpr float kActionsMenuRightPadding = 10.f;
 
 constexpr int kNameLabelTag = 1000;
 constexpr int kStatusTag = 1001;
@@ -91,6 +91,7 @@ cocos2d::CCNode* ProfileManagerPopup::makeSlotRow(
             ->setGap(kButtonRowGap)
             ->setAxisAlignment(AxisAlignment::End)
             ->setCrossAxisAlignment(AxisAlignment::Center)
+            ->setPadding(Padding(0.f, 0.f, kActionsMenuRightPadding, 0.f))
     );
     menu->setID(profileNodeId(fmt::format("profile-slot-{}-actions", idx)));
     row->addChild(menu);
@@ -159,11 +160,6 @@ cocos2d::CCNode* ProfileManagerPopup::makeSlotRow(
     );
     loadBtn->setUserObject(CCInteger::create(static_cast<int>(idx)));
     loadBtn->setTag(kLoadButtonTag);
-    loadBtn->setLayoutOptions(
-        AxisLayoutOptions::create()->setPrevGap(
-            kButtonRowGap + kLoadButtonLeftGapExtra
-        )
-    );
     loadBtn->setID(profileNodeId(fmt::format("profile-slot-{}-load", idx)));
     menu->addChild(loadBtn);
 

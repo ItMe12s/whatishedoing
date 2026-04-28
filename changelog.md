@@ -1,6 +1,6 @@
 # 1.1.0
 
-- Profile manager page
+- Profile manager
 
 ## 1.0.7
 

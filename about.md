@@ -12,7 +12,7 @@ Show other people what you are doing by automatically sending Discord webhook me
 ## Profile manager
 
 On this mod's settings page, open **Manage Profiles** to work with up to 10 named slots.
-Don't forget to save a profile if you add/remove a level from the ID filer!
+Don't forget to save a profile after you add/remove a level from the ID filter!
 
 - **Save** stores a snapshot of your **last-applied** mod settings into that slot.
 - **Load** applies a saved slot and closes open settings popups so values apply cleanly.
