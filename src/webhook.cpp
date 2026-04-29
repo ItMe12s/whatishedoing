@@ -10,6 +10,7 @@
 #include <optional>
 #include <string_view>
 #include <thread>
+#include <vector>
 
 using namespace geode::prelude;
 
@@ -26,6 +27,27 @@ std::optional<std::string> normalizeWebhookUrl(std::string const& raw) {
         return std::nullopt;
     }
     return url;
+}
+
+std::vector<std::string> collectWebhookTargets() {
+    static constexpr char const* kExtraKeys[] = {
+        "extra-webhook-url-1",
+        "extra-webhook-url-2",
+        "extra-webhook-url-3",
+        "extra-webhook-url-4",
+    };
+    std::vector<std::string> out;
+    if (auto u = normalizeWebhookUrl(
+            Mod::get()->getSettingValue<std::string>("webhook-url"))) {
+        out.push_back(std::move(*u));
+    }
+    for (auto* key : kExtraKeys) {
+        if (auto u = normalizeWebhookUrl(
+                Mod::get()->getSettingValue<std::string>(key))) {
+            out.push_back(std::move(*u));
+        }
+    }
+    return out;
 }
 
 std::string currentIso8601Utc() {
@@ -250,12 +272,10 @@ void sendImpl(
     std::vector<WebhookField> const& fields,
     std::string const& footer
 ) {
-    auto const urlOpt =
-        normalizeWebhookUrl(
-            Mod::get()->getSettingValue<std::string>("webhook-url")
-        );
-    if (!urlOpt) return;
-    std::string const& url = *urlOpt;
+    auto urls = collectWebhookTargets();
+    if (urls.empty()) {
+        return;
+    }
     auto payload = buildWebhookPayload(
         title,
         description,
@@ -270,14 +290,23 @@ void sendImpl(
         maxRetries = 0;
     }
     if (useSync) {
-        postWebhookSyncWithRetries(url, payload, 0, maxRetries);
+        for (auto const& url : urls) {
+            postWebhookSyncWithRetries(
+                url,
+                matjson::Value(payload),
+                0,
+                maxRetries
+            );
+        }
     } else {
-        postWebhookWithRetries(
-            url,
-            std::move(payload),
-            0,
-            maxRetries
-        );
+        for (auto const& url : urls) {
+            postWebhookWithRetries(
+                url,
+                matjson::Value(payload),
+                0,
+                maxRetries
+            );
+        }
     }
 }
 

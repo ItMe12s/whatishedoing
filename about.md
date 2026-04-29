@@ -37,6 +37,7 @@ These are under **Other Notification Toggles** and below it.
 - **Death** (dying after a configured percentage) (requested by Theitha)
 - **Level ID filter** (All/Blacklist/Whitelist. Online levels use the check beside Favorite and Settings, Editor/local uses the check beside the level info button) (requested by many people)
 - **Startpos progress** (minimum percentage from your startpos until death or completion, applies to death messages and **Startpos Complete**) (requested by Manscapers Discord server)
+- **Extra URL slots** (In case you want to like let 5 servers/channels know what you're doing)
 
 ## Privacy / Security note
 

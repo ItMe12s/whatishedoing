@@ -8,7 +8,7 @@
 	},
 	"id": "imes.whatishedoing",
 	"name": "What is he doing? (Webhook Logger)",
-	"version": "v1.1.2",
+	"version": "v1.1.3",
 	"developer": "imes",
 	"description": "Sends optional notifications based on your actions to a Discord webhook you configure.",
 	"dependencies": {
@@ -43,7 +43,7 @@
 		"webhook-url": {
 			"type": "string",
 			"name": "Webhook URL",
-			"description": "HTTPS Discord webhook URL. Leave empty to disable all outbound messages.",
+			"description": "HTTPS Discord webhook URL. Outbound messages are disabled only when this URL and every Extra Webhook URL below are empty.",
 			"default": "",
 			"filter": "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789:/.?=-_"
 		},
@@ -166,6 +166,38 @@
 			"name": "Don't Send Redacted Messages",
 			"description": "When on, any level message that would otherwise be sent as \"Private level\" (because of the filter mode above) is dropped entirely instead of sent. Use this for full privacy on filtered levels. Affects level start, exit, complete, death, new best, and editor open/exit.",
 			"default": false
+		},
+		"extra-webhook-urls-title": {
+			"type": "title",
+			"name": "Extra Webhook URLs"
+		},
+		"extra-webhook-url-1": {
+			"type": "string",
+			"name": "Extra Webhook URL 1",
+			"description": "Optional HTTPS Discord webhook URL. Empty is ignored. Each notification is sent to the main Webhook URL and every non-empty extra URL.",
+			"default": "",
+			"filter": "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789:/.?=-_"
+		},
+		"extra-webhook-url-2": {
+			"type": "string",
+			"name": "Extra Webhook URL 2",
+			"description": "Optional HTTPS Discord webhook URL. Empty is ignored. Each notification is sent to the main Webhook URL and every non-empty extra URL.",
+			"default": "",
+			"filter": "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789:/.?=-_"
+		},
+		"extra-webhook-url-3": {
+			"type": "string",
+			"name": "Extra Webhook URL 3",
+			"description": "Optional HTTPS Discord webhook URL. Empty is ignored. Each notification is sent to the main Webhook URL and every non-empty extra URL.",
+			"default": "",
+			"filter": "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789:/.?=-_"
+		},
+		"extra-webhook-url-4": {
+			"type": "string",
+			"name": "Extra Webhook URL 4",
+			"description": "Optional HTTPS Discord webhook URL. Empty is ignored. Each notification is sent to the main Webhook URL and every non-empty extra URL.",
+			"default": "",
+			"filter": "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789:/.?=-_"
 		}
 	}
 }

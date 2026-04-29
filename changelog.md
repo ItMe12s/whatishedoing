@@ -1,4 +1,8 @@
-# 1.1.2
+# 1.1.3
+
+- 4 extra webhook urls per profile
+
+## 1.1.2
 
 - Actually close the Geode settings page after loading a profile
 

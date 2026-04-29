@@ -15,8 +15,12 @@ constexpr char const* kProfileDataKey = "profile-data";
 constexpr char const* kProfileNamesKey = "profile-names";
 constexpr std::size_t kMaxNameLength = 32;
 
-std::array<Tracked, 16> const kTracked{{
+std::array<Tracked, 20> const kTracked{{
     {"webhook-url", Kind::String},
+    {"extra-webhook-url-1", Kind::String},
+    {"extra-webhook-url-2", Kind::String},
+    {"extra-webhook-url-3", Kind::String},
+    {"extra-webhook-url-4", Kind::String},
     {"webhook-username", Kind::String},
     {"player-name", Kind::String},
     {"max-retries", Kind::Int},
@@ -120,7 +124,7 @@ void applyBlobToSettings(matjson::Value const& blob) {
 
 } // namespace
 
-std::array<Tracked, 16> const& trackedKeys() {
+std::array<Tracked, 20> const& trackedKeys() {
     return kTracked;
 }
 
