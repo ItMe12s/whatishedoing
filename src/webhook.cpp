@@ -115,8 +115,11 @@ matjson::Value buildWebhookPayload(
     embedsArr.push(embed);
 
     auto payload = matjson::Value::object();
-    payload["username"] =
-        Mod::get()->getSettingValue<std::string>("webhook-username");
+    auto username = geode::utils::string::trim(
+        Mod::get()->getSettingValue<std::string>("webhook-username"));
+    if (!username.empty()) {
+        payload["username"] = std::move(username);
+    }
     payload["embeds"] = embedsArr;
     return payload;
 }

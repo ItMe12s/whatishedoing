@@ -50,8 +50,8 @@
 		"webhook-username": {
 			"type": "string",
 			"name": "Webhook Display Name",
-			"description": "The webhook's display name. Leave empty to use the default.",
-			"default": "What is he doing?"
+			"description": "If set, overrides the webhook bot name on each message. Leave empty to use the name configured for this webhook in Discord (Server Settings -> Integrations).",
+			"default": ""
 		},
 		"test-webhook": {
 			"type": "bool",
