@@ -28,7 +28,7 @@ There's also options to resize/disable sending screenshots.
 - **Starting or exiting a level** (level name, creator, ID when available, and time in the run)
 - **Practice runs** (separate from normal)
 - **Level complete** (different message for Normal, Practice, and Startpos runs)
-- **New best** (below 100%)
+- **New best** (below 100% with configurable minimum)
 - **Opening or exiting the editor** (play test and exit paths that leave the editor)
 
 ## Off by default / Community features

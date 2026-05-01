@@ -1,4 +1,8 @@
-# 1.2.1
+# 1.2.2
+
+- **New Best** minimum percentage
+
+## 1.2.1
 
 - Made the webhook display name optional
 

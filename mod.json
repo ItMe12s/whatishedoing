@@ -8,7 +8,7 @@
 	},
 	"id": "imes.whatishedoing",
 	"name": "What is he doing? (Webhook Logger)",
-	"version": "v1.2.1",
+	"version": "v1.2.2",
 	"developer": "imes",
 	"description": "Sends optional notifications based on your actions to a Discord webhook you configure.",
 	"dependencies": {
@@ -106,6 +106,14 @@
 			"name": "Notify on New Best",
 			"description": "Log when you achieve a new best on a level.",
 			"default": true
+		},
+		"new-best-min-percent": {
+			"type": "int",
+			"name": "Minimum New Best Percent",
+			"description": "Skip new best notifications below this percent. Set to 0 to send every new best.",
+			"default": 0,
+			"min": 0,
+			"max": 99
 		},
 		"notify-editor": {
 			"type": "bool",

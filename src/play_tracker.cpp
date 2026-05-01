@@ -253,6 +253,12 @@ void sendNewBestWebhookIfNeeded(PlayLayer* playLayer) {
     if (currentBest >= 100) {
         return;
     }
+    auto const minPct = static_cast<int>(
+        Mod::get()->getSettingValue<int64_t>("new-best-min-percent")
+    );
+    if (currentBest < minPct) {
+        return;
+    }
     session.bestNotifiedPercent = currentBest;
     auto const playerName = getPlayerName();
     auto const display = resolveLevelDisplay(
