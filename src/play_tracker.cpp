@@ -3,9 +3,11 @@
 #include <Geode/modify/PlayLayer.hpp>
 #include <Geode/utils/general.hpp>
 #include <cvolton.level-id-api/include/EditorIDs.hpp>
+#include <optional>
 #include <vector>
 
 #include "embed_colors.hpp"
+#include "screenshot.hpp"
 #include "state.hpp"
 #include "webhook.hpp"
 
@@ -130,6 +132,10 @@ void sendDeathWebhookIfNeeded(
         session.deathNotified = true;
         return;
     }
+    std::optional<std::vector<std::uint8_t>> shot;
+    if (Mod::get()->getSettingValue<bool>("screenshot-death")) {
+        shot = capturePlayLayerScreenshotPng(layer);
+    }
     if (fromStartpos) {
         int const startPct = session.startPercent;
         sendWebhookDirect(
@@ -147,7 +153,9 @@ void sendDeathWebhookIfNeeded(
                 {"Level", display.levelName, true},
                 {"Creator", display.creatorName, true},
                 {"Run", fmt::format("{}-{}%", startPct, currentPercent), true},
-            }
+            },
+            "",
+            std::move(shot)
         );
     } else {
         sendWebhookDirect(
@@ -164,7 +172,9 @@ void sendDeathWebhookIfNeeded(
                 {"Level", display.levelName, true},
                 {"Creator", display.creatorName, true},
                 {"Percent", fmt::format("{}%", currentPercent), true},
-            }
+            },
+            "",
+            std::move(shot)
         );
     }
     session.deathNotified = true;
@@ -213,6 +223,10 @@ void sendNewBestWebhookIfNeeded(PlayLayer* playLayer) {
         Mod::get()->getSettingValue<bool>("suppress-redacted")) {
         return;
     }
+    std::optional<std::vector<std::uint8_t>> shot;
+    if (Mod::get()->getSettingValue<bool>("screenshot-new-best")) {
+        shot = capturePlayLayerScreenshotPng(playLayer);
+    }
     sendWebhookDirect(
         "New Best!",
         fmt::format(
@@ -227,7 +241,9 @@ void sendNewBestWebhookIfNeeded(PlayLayer* playLayer) {
             {"Level", display.levelName, true},
             {"Creator", display.creatorName, true},
             {"Best", fmt::format("{}%", currentBest), true},
-        }
+        },
+        "",
+        std::move(shot)
     );
 }
 } // namespace
@@ -372,6 +388,12 @@ class $modify(MyPlayLayer, PlayLayer) {
                     ));
                 int const progress = 100 - pre.startPercent;
                 if (progress >= 0 && progress >= minSeg) {
+                    std::optional<std::vector<std::uint8_t>> shot;
+                    if (Mod::get()->getSettingValue<bool>(
+                            "screenshot-level-complete"
+                        )) {
+                        shot = capturePlayLayerScreenshotPng(this);
+                    }
                     sendWebhook(
                         "notify-level-complete",
                         "Startpos Complete!",
@@ -391,10 +413,17 @@ class $modify(MyPlayLayer, PlayLayer) {
                              fmt::format("{}-100%", pre.startPercent),
                              true},
                         },
-                        elapsed
+                        elapsed,
+                        std::move(shot)
                     );
                 }
             } else {
+                std::optional<std::vector<std::uint8_t>> shot;
+                if (Mod::get()->getSettingValue<bool>(
+                        "screenshot-level-complete"
+                    )) {
+                    shot = capturePlayLayerScreenshotPng(this);
+                }
                 sendWebhook(
                     "notify-level-complete",
                     pre.completeTitle(),
@@ -409,7 +438,8 @@ class $modify(MyPlayLayer, PlayLayer) {
                         {"Level", display.levelName, true},
                         {"Creator", display.creatorName, true},
                     },
-                    elapsed
+                    elapsed,
+                    std::move(shot)
                 );
             }
         }

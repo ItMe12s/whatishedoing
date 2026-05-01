@@ -139,6 +139,28 @@
 			"min": 0,
 			"max": 99
 		},
+		"screenshot-toggles-title": {
+			"type": "title",
+			"name": "Screenshot Toggles"
+		},
+		"screenshot-level-complete": {
+			"type": "bool",
+			"name": "Screenshot on Level Complete",
+			"description": "Attach a screen capture to level complete webhooks (including practice and startpos segment completes).",
+			"default": false
+		},
+		"screenshot-new-best": {
+			"type": "bool",
+			"name": "Screenshot on New Best",
+			"description": "Attach a screen capture to new best webhooks.",
+			"default": false
+		},
+		"screenshot-death": {
+			"type": "bool",
+			"name": "Screenshot on Death",
+			"description": "Attach a screen capture to death webhooks (normal and startpos runs).",
+			"default": false
+		},
 		"filter-title": {
 			"type": "title",
 			"name": "Level ID Filter"

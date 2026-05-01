@@ -4,9 +4,11 @@
 #include <Geode/utils/general.hpp>
 #include <Geode/utils/string.hpp>
 #include <Geode/utils/web.hpp>
+#include <matjson.hpp>
 #include <algorithm>
 #include <chrono>
 #include <ctime>
+#include <cstdint>
 #include <optional>
 #include <string_view>
 #include <thread>
@@ -14,7 +16,7 @@
 
 using namespace geode::prelude;
 
-namespace {
+namespace webhook_impl {
 
 // Returns nullopt if the URL is missing or not suitable for a Discord
 // webhook POST.
@@ -74,7 +76,8 @@ matjson::Value buildWebhookPayload(
     std::string const& description,
     int color,
     std::vector<WebhookField> const& fields,
-    std::string const& footer
+    std::string const& footer,
+    bool embedScreenshotAttachment
 ) {
     auto fieldsArr = matjson::Value::array();
     for (auto const& f : fields) {
@@ -95,6 +98,11 @@ matjson::Value buildWebhookPayload(
         auto footerObj = matjson::Value::object();
         footerObj["text"] = footer;
         embed["footer"] = footerObj;
+    }
+    if (embedScreenshotAttachment) {
+        auto imgObj = matjson::Value::object();
+        imgObj["url"] = "attachment://screenshot.png";
+        embed["image"] = imgObj;
     }
 
     auto embedsArr = matjson::Value::array();
@@ -217,7 +225,176 @@ void postWebhookWithRetries(
     );
 }
 
-} // namespace
+void postWebhookMultipartWithRetries(
+    std::string const& url,
+    std::string const& payloadJson,
+    std::vector<std::uint8_t> pngBytes,
+    int attempt,
+    int maxRetries
+) {
+    web::MultipartForm form;
+    form.param("payload_json", payloadJson);
+    form.file("files[0]", pngBytes, "screenshot.png", "image/png");
+    auto req = web::WebRequest();
+    req.bodyMultipart(std::move(form));
+    req.timeout(std::chrono::seconds(10));
+
+    async::spawn(
+        req.post(url),
+        [url, payloadJson, pngBytes = std::move(pngBytes), attempt, maxRetries](
+            web::WebResponse res
+        ) mutable {
+            if (res.ok()) return;
+            auto wait = backoffSecondsForFailedAttempt(
+                res,
+                attempt,
+                maxRetries
+            );
+            if (!wait) return;
+            int const delaySec = *wait;
+            std::thread(
+                [url, payloadJson, pngBytes = std::move(pngBytes), delaySec, attempt, maxRetries]() mutable {
+                    std::this_thread::sleep_for(
+                        std::chrono::seconds(delaySec)
+                    );
+                    postWebhookMultipartWithRetries(
+                        url,
+                        payloadJson,
+                        std::move(pngBytes),
+                        attempt + 1,
+                        maxRetries
+                    );
+                }
+            )
+                .detach();
+        }
+    );
+}
+
+void postWebhookSyncMultipartWithRetries(
+    std::string const& url,
+    std::string const& payloadJson,
+    std::vector<std::uint8_t> const& pngBytes,
+    int attempt,
+    int maxRetries
+) {
+    web::MultipartForm form;
+    form.param("payload_json", payloadJson);
+    form.file("files[0]", pngBytes, "screenshot.png", "image/png");
+    auto req = web::WebRequest();
+    req.bodyMultipart(std::move(form));
+    req.timeout(std::chrono::seconds(10));
+
+    auto res = req.postSync(url);
+    if (res.ok()) return;
+
+    auto wait = backoffSecondsForFailedAttempt(
+        res,
+        attempt,
+        maxRetries
+    );
+    if (!wait) return;
+
+    std::this_thread::sleep_for(
+        std::chrono::seconds(*wait)
+    );
+    postWebhookSyncMultipartWithRetries(
+        url,
+        payloadJson,
+        pngBytes,
+        attempt + 1,
+        maxRetries
+    );
+}
+
+void sendImpl(
+    bool useSync,
+    std::string const& title,
+    std::string const& description,
+    int color,
+    std::vector<WebhookField> const& fields,
+    std::string const& footer,
+    std::optional<std::vector<std::uint8_t>> screenshotPng
+) {
+    auto urls = collectWebhookTargets();
+    if (urls.empty()) {
+        return;
+    }
+    auto maxRetries = static_cast<int>(
+        Mod::get()->getSettingValue<int64_t>("max-retries")
+    );
+    if (maxRetries < 0) {
+        maxRetries = 0;
+    }
+
+    bool const hasShot =
+        screenshotPng.has_value() && !screenshotPng->empty();
+
+    if (hasShot) {
+        auto payload = buildWebhookPayload(
+            title,
+            description,
+            color,
+            fields,
+            footer,
+            true
+        );
+        auto payloadJson = payload.dump(matjson::NO_INDENTATION);
+        std::vector<std::uint8_t> const& bytes = *screenshotPng;
+        if (useSync) {
+            for (auto const& url : urls) {
+                postWebhookSyncMultipartWithRetries(
+                    url,
+                    payloadJson,
+                    bytes,
+                    0,
+                    maxRetries
+                );
+            }
+        } else {
+            for (auto const& url : urls) {
+                postWebhookMultipartWithRetries(
+                    url,
+                    payloadJson,
+                    bytes,
+                    0,
+                    maxRetries
+                );
+            }
+        }
+        return;
+    }
+
+    auto payload = buildWebhookPayload(
+        title,
+        description,
+        color,
+        fields,
+        footer,
+        false
+    );
+    if (useSync) {
+        for (auto const& url : urls) {
+            postWebhookSyncWithRetries(
+                url,
+                matjson::Value(payload),
+                0,
+                maxRetries
+            );
+        }
+    } else {
+        for (auto const& url : urls) {
+            postWebhookWithRetries(
+                url,
+                matjson::Value(payload),
+                0,
+                maxRetries
+            );
+        }
+    }
+}
+
+} // namespace webhook_impl
 
 std::string formatDuration(int totalSeconds) {
     auto h = totalSeconds / 3600;
@@ -264,66 +441,22 @@ std::string formatDurationMs(int64_t totalMs) {
     );
 }
 
-void sendImpl(
-    bool useSync,
-    std::string const& title,
-    std::string const& description,
-    int color,
-    std::vector<WebhookField> const& fields,
-    std::string const& footer
-) {
-    auto urls = collectWebhookTargets();
-    if (urls.empty()) {
-        return;
-    }
-    auto payload = buildWebhookPayload(
-        title,
-        description,
-        color,
-        fields,
-        footer
-    );
-    auto maxRetries = static_cast<int>(
-        Mod::get()->getSettingValue<int64_t>("max-retries")
-    );
-    if (maxRetries < 0) {
-        maxRetries = 0;
-    }
-    if (useSync) {
-        for (auto const& url : urls) {
-            postWebhookSyncWithRetries(
-                url,
-                matjson::Value(payload),
-                0,
-                maxRetries
-            );
-        }
-    } else {
-        for (auto const& url : urls) {
-            postWebhookWithRetries(
-                url,
-                matjson::Value(payload),
-                0,
-                maxRetries
-            );
-        }
-    }
-}
-
 void sendWebhookDirect(
     std::string const& title,
     std::string const& description,
     int color,
     std::vector<WebhookField> const& fields,
-    std::string const& footer
+    std::string const& footer,
+    std::optional<std::vector<std::uint8_t>> screenshotPng
 ) {
-    sendImpl(
+    webhook_impl::sendImpl(
         false,
         title,
         description,
         color,
         fields,
-        footer
+        footer,
+        std::move(screenshotPng)
     );
 }
 
@@ -332,15 +465,17 @@ void sendWebhookDirectSync(
     std::string const& description,
     int color,
     std::vector<WebhookField> const& fields,
-    std::string const& footer
+    std::string const& footer,
+    std::optional<std::vector<std::uint8_t>> screenshotPng
 ) {
-    sendImpl(
+    webhook_impl::sendImpl(
         true,
         title,
         description,
         color,
         fields,
-        footer
+        footer,
+        std::move(screenshotPng)
     );
 }
 
@@ -350,7 +485,8 @@ void sendWebhook(
     std::string const& description,
     int color,
     std::vector<WebhookField> const& fields,
-    std::string const& footer
+    std::string const& footer,
+    std::optional<std::vector<std::uint8_t>> screenshotPng
 ) {
     if (!Mod::get()->getSettingValue<bool>(settingKey)) {
         return;
@@ -360,6 +496,7 @@ void sendWebhook(
         description,
         color,
         fields,
-        footer
+        footer,
+        std::move(screenshotPng)
     );
 }

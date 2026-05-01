@@ -2,6 +2,7 @@
 
 #include <Geode/Geode.hpp>
 #include <cstdint>
+#include <optional>
 #include <string>
 #include <vector>
 
@@ -19,7 +20,8 @@ void sendWebhookDirect(
     std::string const& description,
     int color,
     std::vector<WebhookField> const& fields = {},
-    std::string const& footer = ""
+    std::string const& footer = "",
+    std::optional<std::vector<std::uint8_t>> screenshotPng = std::nullopt
 );
 
 void sendWebhookDirectSync(
@@ -27,7 +29,8 @@ void sendWebhookDirectSync(
     std::string const& description,
     int color,
     std::vector<WebhookField> const& fields = {},
-    std::string const& footer = ""
+    std::string const& footer = "",
+    std::optional<std::vector<std::uint8_t>> screenshotPng = std::nullopt
 );
 
 void sendWebhook(
@@ -36,5 +39,6 @@ void sendWebhook(
     std::string const& description,
     int color,
     std::vector<WebhookField> const& fields = {},
-    std::string const& footer = ""
+    std::string const& footer = "",
+    std::optional<std::vector<std::uint8_t>> screenshotPng = std::nullopt
 );
