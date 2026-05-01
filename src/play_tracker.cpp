@@ -4,7 +4,6 @@
 #include <Geode/utils/general.hpp>
 #include <Geode/utils/string.hpp>
 #include <cvolton.level-id-api/include/EditorIDs.hpp>
-#include <algorithm>
 #include <optional>
 #include <string>
 #include <vector>
@@ -53,13 +52,9 @@ void queueStartposSegmentStart(PlayLayer* layer) {
     });
 }
 
-int clampedScreenshotScalePercent() {
-    return std::clamp(
-        static_cast<int>(
-            Mod::get()->getSettingValue<int64_t>("screenshot-scale-percent")
-        ),
-        25,
-        100
+int screenshotScalePercent() {
+    return static_cast<int>(
+        Mod::get()->getSettingValue<int64_t>("screenshot-scale-percent")
     );
 }
 
@@ -213,7 +208,7 @@ void sendDeathWebhookIfNeeded(
     }
     spawnScreenshotEncodeToPngThen(
         std::move(*capOpt),
-        clampedScreenshotScalePercent(),
+        screenshotScalePercent(),
         screenshotEncodeTmpPath(),
         [=, &session](std::optional<std::vector<std::uint8_t>> shot) {
             sendDeath(std::move(shot));
@@ -296,7 +291,7 @@ void sendNewBestWebhookIfNeeded(PlayLayer* playLayer) {
     }
     spawnScreenshotEncodeToPngThen(
         std::move(*capOpt),
-        clampedScreenshotScalePercent(),
+        screenshotScalePercent(),
         screenshotEncodeTmpPath(),
         [=](std::optional<std::vector<std::uint8_t>> shot) {
             sendNewBest(std::move(shot));
@@ -488,7 +483,7 @@ class $modify(MyPlayLayer, PlayLayer) {
                         } else {
                             spawnScreenshotEncodeToPngThen(
                                 std::move(*capOpt),
-                                clampedScreenshotScalePercent(),
+                                screenshotScalePercent(),
                                 screenshotEncodeTmpPath(),
                                 [=](std::optional<
                                     std::vector<std::uint8_t>> shot) {
@@ -530,7 +525,7 @@ class $modify(MyPlayLayer, PlayLayer) {
                     } else {
                         spawnScreenshotEncodeToPngThen(
                             std::move(*capOpt),
-                            clampedScreenshotScalePercent(),
+                            screenshotScalePercent(),
                             screenshotEncodeTmpPath(),
                             [=](std::optional<
                                 std::vector<std::uint8_t>> shot) {
