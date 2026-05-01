@@ -113,6 +113,42 @@
 			"description": "Log when the editor is opened and when you leave the editor (save and play, save and exit, exit without save).",
 			"default": true
 		},
+		"screenshot-toggles-title": {
+			"type": "title",
+			"name": "Screenshot Toggles"
+		},
+		"screenshot-level-complete": {
+			"type": "bool",
+			"name": "Screenshot on Level Complete",
+			"description": "Attach a screen capture to level complete webhooks (including practice and startpos segment completes).",
+			"default": true
+		},
+		"screenshot-new-best": {
+			"type": "bool",
+			"name": "Screenshot on New Best",
+			"description": "Attach a screen capture to new best webhooks.",
+			"default": true
+		},
+		"screenshot-death": {
+			"type": "bool",
+			"name": "Screenshot on Death",
+			"description": "Attach a screen capture to death webhooks (normal and startpos runs).",
+			"default": true
+		},
+		"screenshot-scale-percent": {
+			"type": "int",
+			"name": "Screenshot PNG Scale",
+			"description": "Output size as percent of captured resolution. Lower values means smaller PNGs and uploads.",
+			"default": 100,
+			"min": 25,
+			"max": 100,
+			"control": {
+				"slider": true,
+				"slider-step": 5,
+				"arrow-step": 5,
+				"big-arrow-step": 10
+			}
+		},
 		"other-notify-title": {
 			"type": "title",
 			"name": "Other Notification Toggles"
@@ -138,28 +174,6 @@
 			"default": 20,
 			"min": 0,
 			"max": 99
-		},
-		"screenshot-toggles-title": {
-			"type": "title",
-			"name": "Screenshot Toggles"
-		},
-		"screenshot-level-complete": {
-			"type": "bool",
-			"name": "Screenshot on Level Complete",
-			"description": "Attach a screen capture to level complete webhooks (including practice and startpos segment completes).",
-			"default": false
-		},
-		"screenshot-new-best": {
-			"type": "bool",
-			"name": "Screenshot on New Best",
-			"description": "Attach a screen capture to new best webhooks.",
-			"default": false
-		},
-		"screenshot-death": {
-			"type": "bool",
-			"name": "Screenshot on Death",
-			"description": "Attach a screen capture to death webhooks (normal and startpos runs).",
-			"default": false
 		},
 		"filter-title": {
 			"type": "title",
