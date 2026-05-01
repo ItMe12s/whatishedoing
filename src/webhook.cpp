@@ -9,6 +9,7 @@
 #include <chrono>
 #include <ctime>
 #include <cstdint>
+#include <memory>
 #include <optional>
 #include <string_view>
 #include <thread>
@@ -17,6 +18,11 @@
 using namespace geode::prelude;
 
 namespace webhook_impl {
+
+constexpr auto kAsyncRequestTimeout = std::chrono::seconds(10);
+constexpr auto kSyncRequestTimeout = std::chrono::seconds(3);
+constexpr int kSyncMaxRetries = 1;
+constexpr int kSyncMaxRetryDelaySeconds = 2;
 
 // Returns nullopt if the URL is missing or not suitable for a Discord
 // webhook POST.
@@ -118,7 +124,8 @@ matjson::Value buildWebhookPayload(
 std::optional<int> backoffSecondsForFailedAttempt(
     web::WebResponse const& res,
     int attempt,
-    int maxRetries
+    int maxRetries,
+    std::optional<int> maxDelaySeconds = std::nullopt
 ) {
     if (attempt >= maxRetries) {
         log::warn(
@@ -135,21 +142,27 @@ std::optional<int> backoffSecondsForFailedAttempt(
                 std::string_view{*ra},
                 10
             );
-            return n.mapOr(2, [](int v) {
-                return std::clamp(v, 1, 86'400);
+            return n.mapOr(2, [maxDelaySeconds](int v) {
+                int const maxDelay = maxDelaySeconds.value_or(86'400);
+                return std::clamp(v, 1, maxDelay);
             });
         }
-        return 2;
+        return maxDelaySeconds
+            ? std::min(2, *maxDelaySeconds)
+            : 2;
     }
     int const wait = 1 << attempt;
+    int const clampedWait = maxDelaySeconds
+        ? std::min(wait, *maxDelaySeconds)
+        : wait;
     log::warn(
         "Webhook POST failed (status {}), retrying in {}s ({}/{})",
         res.code(),
-        wait,
+        clampedWait,
         attempt + 1,
         maxRetries + 1
     );
-    return wait;
+    return clampedWait;
 }
 
 void postWebhookSyncWithRetries(
@@ -161,7 +174,7 @@ void postWebhookSyncWithRetries(
     auto req = web::WebRequest();
     req.header("Content-Type", "application/json");
     req.bodyJSON(payload);
-    req.timeout(std::chrono::seconds(10));
+    req.timeout(kSyncRequestTimeout);
 
     auto res = req.postSync(url);
     if (res.ok()) return;
@@ -169,7 +182,8 @@ void postWebhookSyncWithRetries(
     auto wait = backoffSecondsForFailedAttempt(
         res,
         attempt,
-        maxRetries
+        maxRetries,
+        kSyncMaxRetryDelaySeconds
     );
     if (!wait) return;
 
@@ -193,7 +207,7 @@ void postWebhookWithRetries(
     auto req = web::WebRequest();
     req.header("Content-Type", "application/json");
     req.bodyJSON(payload);
-    req.timeout(std::chrono::seconds(10));
+    req.timeout(kAsyncRequestTimeout);
 
     async::spawn(
         req.post(url),
@@ -207,20 +221,24 @@ void postWebhookWithRetries(
             );
             if (!wait) return;
             int const delaySec = *wait;
-            std::thread(
+            async::runtime().spawnBlocking<void>(
                 [url, payload = std::move(payload), delaySec, attempt, maxRetries]() mutable {
-                    std::this_thread::sleep_for(
-                        std::chrono::seconds(delaySec)
-                    );
-                    postWebhookWithRetries(
-                        url,
-                        std::move(payload),
-                        attempt + 1,
-                        maxRetries
+                    std::this_thread::sleep_for(std::chrono::seconds(delaySec));
+                    geode::queueInMainThread(
+                        [url = std::move(url),
+                         payload = std::move(payload),
+                         attempt,
+                         maxRetries]() mutable {
+                            postWebhookWithRetries(
+                                url,
+                                std::move(payload),
+                                attempt + 1,
+                                maxRetries
+                            );
+                        }
                     );
                 }
-            )
-                .detach();
+            );
         }
     );
 }
@@ -228,16 +246,19 @@ void postWebhookWithRetries(
 void postWebhookMultipartWithRetries(
     std::string const& url,
     std::string const& payloadJson,
-    std::vector<std::uint8_t> pngBytes,
+    std::shared_ptr<std::vector<std::uint8_t> const> pngBytes,
     int attempt,
     int maxRetries
 ) {
+    if (!pngBytes) {
+        return;
+    }
     web::MultipartForm form;
     form.param("payload_json", payloadJson);
-    form.file("files[0]", pngBytes, "screenshot.png", "image/png");
+    form.file("files[0]", *pngBytes, "screenshot.png", "image/png");
     auto req = web::WebRequest();
     req.bodyMultipart(std::move(form));
-    req.timeout(std::chrono::seconds(10));
+    req.timeout(kAsyncRequestTimeout);
 
     async::spawn(
         req.post(url),
@@ -252,21 +273,26 @@ void postWebhookMultipartWithRetries(
             );
             if (!wait) return;
             int const delaySec = *wait;
-            std::thread(
+            async::runtime().spawnBlocking<void>(
                 [url, payloadJson, pngBytes = std::move(pngBytes), delaySec, attempt, maxRetries]() mutable {
-                    std::this_thread::sleep_for(
-                        std::chrono::seconds(delaySec)
-                    );
-                    postWebhookMultipartWithRetries(
-                        url,
-                        payloadJson,
-                        std::move(pngBytes),
-                        attempt + 1,
-                        maxRetries
+                    std::this_thread::sleep_for(std::chrono::seconds(delaySec));
+                    geode::queueInMainThread(
+                        [url = std::move(url),
+                         payloadJson = std::move(payloadJson),
+                         pngBytes = std::move(pngBytes),
+                         attempt,
+                         maxRetries]() mutable {
+                            postWebhookMultipartWithRetries(
+                                url,
+                                payloadJson,
+                                std::move(pngBytes),
+                                attempt + 1,
+                                maxRetries
+                            );
+                        }
                     );
                 }
-            )
-                .detach();
+            );
         }
     );
 }
@@ -283,7 +309,7 @@ void postWebhookSyncMultipartWithRetries(
     form.file("files[0]", pngBytes, "screenshot.png", "image/png");
     auto req = web::WebRequest();
     req.bodyMultipart(std::move(form));
-    req.timeout(std::chrono::seconds(10));
+    req.timeout(kSyncRequestTimeout);
 
     auto res = req.postSync(url);
     if (res.ok()) return;
@@ -291,7 +317,8 @@ void postWebhookSyncMultipartWithRetries(
     auto wait = backoffSecondsForFailedAttempt(
         res,
         attempt,
-        maxRetries
+        maxRetries,
+        kSyncMaxRetryDelaySeconds
     );
     if (!wait) return;
 
@@ -326,6 +353,9 @@ void sendImpl(
     if (maxRetries < 0) {
         maxRetries = 0;
     }
+    int const effectiveMaxRetries = useSync
+        ? std::min(maxRetries, kSyncMaxRetries)
+        : maxRetries;
 
     bool const hasShot =
         screenshotPng.has_value() && !screenshotPng->empty();
@@ -340,25 +370,29 @@ void sendImpl(
             true
         );
         auto payloadJson = payload.dump(matjson::NO_INDENTATION);
-        std::vector<std::uint8_t> const& bytes = *screenshotPng;
         if (useSync) {
+            std::vector<std::uint8_t> const& bytes = *screenshotPng;
             for (auto const& url : urls) {
                 postWebhookSyncMultipartWithRetries(
                     url,
                     payloadJson,
                     bytes,
                     0,
-                    maxRetries
+                    effectiveMaxRetries
                 );
             }
         } else {
+            auto sharedBytes =
+                std::make_shared<std::vector<std::uint8_t> const>(
+                    std::move(*screenshotPng)
+                );
             for (auto const& url : urls) {
                 postWebhookMultipartWithRetries(
                     url,
                     payloadJson,
-                    bytes,
+                    sharedBytes,
                     0,
-                    maxRetries
+                    effectiveMaxRetries
                 );
             }
         }
@@ -379,7 +413,7 @@ void sendImpl(
                 url,
                 matjson::Value(payload),
                 0,
-                maxRetries
+                effectiveMaxRetries
             );
         }
     } else {
@@ -388,7 +422,7 @@ void sendImpl(
                 url,
                 matjson::Value(payload),
                 0,
-                maxRetries
+                effectiveMaxRetries
             );
         }
     }

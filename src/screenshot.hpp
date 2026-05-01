@@ -21,6 +21,5 @@ std::optional<CapturedScreenshotRgba> capturePlayLayerScreenshotRgba(
 void spawnScreenshotEncodeToPngThen(
     CapturedScreenshotRgba captured,
     int scalePercentClamped,
-    std::string tmpPathStr,
     std::function<void(std::optional<std::vector<std::uint8_t>> png)> onMainThread
 );

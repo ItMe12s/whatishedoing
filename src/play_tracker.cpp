@@ -22,45 +22,42 @@ void syncPlayMode(PlayLayer* layer) {
     session.practice = layer->m_isPracticeMode;
 }
 
-void applyStartposSegmentStart(PlayLayer* layer) {
-    if (!layer || !layer->m_level) {
-        return;
-    }
-    if (!layer->m_isTestMode) {
-        return;
-    }
-    if (layer->m_isPracticeMode) {
-        return;
-    }
-    auto& s = levelSession();
-    s.startPercent = static_cast<int>(layer->getCurrentPercent());
-    s.bestNotifiedPercent = s.startPercent;
+bool matchesLevelSession(
+    int levelID,
+    std::string const& levelName,
+    Clock::time_point attemptStart
+) {
+    auto const& s = levelSession();
+    return s.active
+        && s.levelID == levelID
+        && s.levelName == levelName
+        && s.attemptStart == attemptStart;
 }
 
 void queueStartposSegmentStart(PlayLayer* layer) {
     if (!layer || !layer->m_level || !layer->m_isTestMode) {
         return;
     }
-    geode::queueInMainThread([layer] {
-        if (!layer->m_level || !layer->m_isTestMode) {
+    if (layer->m_isPracticeMode) {
+        return;
+    }
+    auto const levelID = EditorIDs::getID(layer->m_level);
+    std::string const levelName = std::string(layer->m_level->m_levelName);
+    auto const attemptStart = levelSession().attemptStart;
+    int const startPercent = static_cast<int>(layer->getCurrentPercent());
+    geode::queueInMainThread([levelID, levelName, attemptStart, startPercent] {
+        if (!matchesLevelSession(levelID, levelName, attemptStart)) {
             return;
         }
-        if (!levelSession().active) {
-            return;
-        }
-        applyStartposSegmentStart(layer);
+        auto& s = levelSession();
+        s.startPercent = startPercent;
+        s.bestNotifiedPercent = s.startPercent;
     });
 }
 
 int screenshotScalePercent() {
     return static_cast<int>(
         Mod::get()->getSettingValue<int64_t>("screenshot-scale-percent")
-    );
-}
-
-std::string screenshotEncodeTmpPath() {
-    return geode::utils::string::pathToString(
-        Mod::get()->getSaveDir() / "whatishedoing_cap_tmp.png"
     );
 }
 
@@ -147,8 +144,11 @@ void sendDeathWebhookIfNeeded(
         return;
     }
     int const deathStartPct = session.startPercent;
+    int const sessionLevelID = session.levelID;
+    std::string const sessionLevelName = session.levelName;
+    auto const sessionAttemptStart = session.attemptStart;
     auto sendDeath =
-        [=, &session](std::optional<std::vector<std::uint8_t>> shot) {
+        [=](std::optional<std::vector<std::uint8_t>> shot) {
             if (fromStartpos) {
                 sendWebhookDirect(
                     "Died",
@@ -195,7 +195,13 @@ void sendDeathWebhookIfNeeded(
                     std::move(shot)
                 );
             }
-            session.deathNotified = true;
+            if (matchesLevelSession(
+                    sessionLevelID,
+                    sessionLevelName,
+                    sessionAttemptStart
+                )) {
+                levelSession().deathNotified = true;
+            }
         };
     if (!Mod::get()->getSettingValue<bool>("screenshot-death")) {
         sendDeath(std::nullopt);
@@ -209,8 +215,7 @@ void sendDeathWebhookIfNeeded(
     spawnScreenshotEncodeToPngThen(
         std::move(*capOpt),
         screenshotScalePercent(),
-        screenshotEncodeTmpPath(),
-        [=, &session](std::optional<std::vector<std::uint8_t>> shot) {
+        [=](std::optional<std::vector<std::uint8_t>> shot) {
             sendDeath(std::move(shot));
         }
     );
@@ -292,7 +297,6 @@ void sendNewBestWebhookIfNeeded(PlayLayer* playLayer) {
     spawnScreenshotEncodeToPngThen(
         std::move(*capOpt),
         screenshotScalePercent(),
-        screenshotEncodeTmpPath(),
         [=](std::optional<std::vector<std::uint8_t>> shot) {
             sendNewBest(std::move(shot));
         }
@@ -484,7 +488,6 @@ class $modify(MyPlayLayer, PlayLayer) {
                             spawnScreenshotEncodeToPngThen(
                                 std::move(*capOpt),
                                 screenshotScalePercent(),
-                                screenshotEncodeTmpPath(),
                                 [=](std::optional<
                                     std::vector<std::uint8_t>> shot) {
                                     fireWebhook(std::move(shot));
@@ -526,7 +529,6 @@ class $modify(MyPlayLayer, PlayLayer) {
                         spawnScreenshotEncodeToPngThen(
                             std::move(*capOpt),
                             screenshotScalePercent(),
-                            screenshotEncodeTmpPath(),
                             [=](std::optional<
                                 std::vector<std::uint8_t>> shot) {
                                 fireWebhook(std::move(shot));

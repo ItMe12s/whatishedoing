@@ -11,6 +11,7 @@
 
 #include <algorithm>
 #include <array>
+#include <atomic>
 #include <cmath>
 #include <cstring>
 #include <filesystem>
@@ -21,8 +22,18 @@
 using namespace geode::prelude;
 using namespace cocos2d;
 
-// Found this gem on https://www.kevincao.xyz/posts/image-resizing
+// https://www.kevincao.xyz/posts/image-resizing
 namespace {
+
+std::atomic<std::uint64_t> g_encodeTmpSeq{0};
+
+std::string uniqueEncodeTmpPath() {
+    auto const n = g_encodeTmpSeq.fetch_add(1, std::memory_order_relaxed);
+    return geode::utils::string::pathToString(
+        Mod::get()->getSaveDir()
+        / fmt::format("whatishedoing_cap_{}.png", n)
+    );
+}
 
 double lanczos2(double x) {
     constexpr double a = 2;
@@ -270,8 +281,12 @@ std::optional<CapturedScreenshotRgba> capturePlayLayerScreenshotRgba(
     rt->beginWithClear(0, 0, 0, 0);
     playLayer->visit();
 
-    auto rawData =
-        std::vector<GLubyte>(static_cast<size_t>(pixelWidth * pixelHeight * 4));
+    auto const bufBytes =
+        static_cast<size_t>(pixelWidth) * static_cast<size_t>(pixelHeight) * 4;
+    CapturedScreenshotRgba cap;
+    cap.width = pixelWidth;
+    cap.height = pixelHeight;
+    cap.rgba.resize(bufBytes);
     GLint packAlign = 0;
     glGetIntegerv(GL_PACK_ALIGNMENT, &packAlign);
     glPixelStorei(GL_PACK_ALIGNMENT, 1);
@@ -282,7 +297,7 @@ std::optional<CapturedScreenshotRgba> capturePlayLayerScreenshotRgba(
         pixelHeight,
         GL_RGBA,
         GL_UNSIGNED_BYTE,
-        rawData.data()
+        cap.rgba.data()
     );
     glPixelStorei(GL_PACK_ALIGNMENT, packAlign);
 
@@ -299,18 +314,26 @@ std::optional<CapturedScreenshotRgba> capturePlayLayerScreenshotRgba(
     );
     director->setViewport();
 
-    auto const bufBytes =
-        static_cast<size_t>(pixelWidth) * static_cast<size_t>(pixelHeight) * 4;
-    CapturedScreenshotRgba cap;
-    cap.width = pixelWidth;
-    cap.height = pixelHeight;
-    cap.rgba.resize(bufBytes);
-    for (int i = 0; i < pixelHeight; ++i) {
+    auto const rowBytes = static_cast<size_t>(pixelWidth) * 4;
+    std::vector<std::uint8_t> rowTmp(rowBytes);
+    for (int i = 0; i < pixelHeight / 2; ++i) {
+        auto* top = cap.rgba.data() + static_cast<size_t>(i) * rowBytes;
+        auto* bottom = cap.rgba.data()
+            + static_cast<size_t>(pixelHeight - i - 1) * rowBytes;
         std::memcpy(
-            cap.rgba.data() + static_cast<size_t>(i * pixelWidth * 4),
-            rawData.data()
-                + static_cast<size_t>((pixelHeight - i - 1) * pixelWidth * 4),
-            static_cast<size_t>(pixelWidth * 4)
+            rowTmp.data(),
+            top,
+            rowBytes
+        );
+        std::memcpy(
+            top,
+            bottom,
+            rowBytes
+        );
+        std::memcpy(
+            bottom,
+            rowTmp.data(),
+            rowBytes
         );
     }
 
@@ -320,13 +343,13 @@ std::optional<CapturedScreenshotRgba> capturePlayLayerScreenshotRgba(
 void spawnScreenshotEncodeToPngThen(
     CapturedScreenshotRgba captured,
     int scalePct,
-    std::string tmpPathStr,
     std::function<void(std::optional<std::vector<std::uint8_t>> png)> onMainThread
 ) {
+    std::string const tmp = uniqueEncodeTmpPath();
     geode::async::runtime().spawnBlocking<void>([
         cap = std::move(captured),
         scalePct,
-        tmp = std::move(tmpPathStr),
+        tmp,
         cb = std::move(onMainThread)
     ]() mutable {
         auto png = encodeRgbaToPngBytes(

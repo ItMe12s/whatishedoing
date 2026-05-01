@@ -13,6 +13,7 @@
 #include <Geode/utils/cocos.hpp>
 #include <Geode/utils/string.hpp>
 #include <functional>
+#include <optional>
 #include <string>
 
 using namespace geode::prelude;
@@ -60,12 +61,12 @@ void styleLoadDeleteButton(CCMenuItemSpriteExtra* btn, bool slotFilled) {
 
 CCMenuItemSpriteExtra* findItemByTag(CCMenu* menu, int tag) {
     if (!menu) return nullptr;
-    return static_cast<CCMenuItemSpriteExtra*>(menu->getChildByTag(tag));
+    return typeinfo_cast<CCMenuItemSpriteExtra*>(menu->getChildByTag(tag));
 }
 
 CCMenu* findMenu(CCNode* row) {
     if (!row || !row->getChildren()) return nullptr;
-    return static_cast<CCMenu*>(row->getChildren()->lastObject());
+    return typeinfo_cast<CCMenu*>(row->getChildren()->lastObject());
 }
 
 std::string profileNodeId(std::string const& local) {
@@ -241,7 +242,7 @@ void ProfileManagerPopup::refreshRow(
     auto const slot = slotNameAt(idx);
     bool const filled = slotIsFilled(slot);
 
-    if (auto* label = static_cast<CCLabelBMFont*>(
+    if (auto* label = typeinfo_cast<CCLabelBMFont*>(
             row->getChildByTag(kNameLabelTag))) {
         label->setString(slot.c_str());
         label->limitLabelWidth(
@@ -250,7 +251,7 @@ void ProfileManagerPopup::refreshRow(
             kNameLabelMinScale
         );
     }
-    if (auto* status = static_cast<CCLabelBMFont*>(
+    if (auto* status = typeinfo_cast<CCLabelBMFont*>(
             row->getChildByTag(kStatusTag))) {
         status->setString(filled ? "saved" : "empty");
         status->setColor(
@@ -311,26 +312,68 @@ bool ProfileManagerPopup::init() {
 
 namespace {
 
-std::size_t indexFromSender(CCObject* sender) {
-    auto* btn = static_cast<CCMenuItemSpriteExtra*>(sender);
-    auto* idxObj = static_cast<CCInteger*>(btn->getUserObject());
-    return idxObj
-        ? static_cast<std::size_t>(idxObj->getValue())
-        : 0;
+struct ReleaseProfilePopup {
+    ProfileManagerPopup* self = nullptr;
+    explicit ReleaseProfilePopup(ProfileManagerPopup* s) : self(s) {}
+    ~ReleaseProfilePopup() {
+        if (self) {
+            self->release();
+        }
+    }
+    ReleaseProfilePopup(ReleaseProfilePopup const&) = delete;
+    ReleaseProfilePopup& operator=(ReleaseProfilePopup const&) = delete;
+};
+
+CCNode* findSlotRowForIndex(ProfileManagerPopup* popup, std::size_t idx) {
+    if (!popup) {
+        return nullptr;
+    }
+    auto const wantId = profileNodeId(fmt::format("profile-slot-row-{}", idx));
+    return cocos::findFirstChildRecursive<CCNode>(
+        popup,
+        [wantId](CCNode* c) {
+            return c && std::string(c->getID()) == wantId;
+        }
+    );
 }
 
-CCNode* rowFromButton(CCObject* sender) {
-    return static_cast<CCNode*>(sender)->getParent()->getParent();
+std::optional<std::size_t> slotIndexFromSender(CCObject* sender) {
+    auto* btn = typeinfo_cast<CCMenuItemSpriteExtra*>(sender);
+    if (!btn) {
+        return std::nullopt;
+    }
+    auto* idxObj = typeinfo_cast<CCInteger*>(btn->getUserObject());
+    if (!idxObj) {
+        return std::nullopt;
+    }
+    auto const rawIdx = idxObj->getValue();
+    if (rawIdx < 0) {
+        return std::nullopt;
+    }
+    auto const idx = static_cast<std::size_t>(rawIdx);
+    if (idx >= kSlotCount) {
+        return std::nullopt;
+    }
+    auto* menu = typeinfo_cast<CCMenu*>(btn->getParent());
+    if (!menu) {
+        return std::nullopt;
+    }
+    if (!typeinfo_cast<CCNode*>(menu->getParent())) {
+        return std::nullopt;
+    }
+    return idx;
 }
 
 } // namespace
 
 void ProfileManagerPopup::onSaveSlot(cocos2d::CCObject* sender) {
-    auto const idx = indexFromSender(sender);
+    auto idxOpt = slotIndexFromSender(sender);
+    if (!idxOpt) return;
+    auto const idx = *idxOpt;
     auto const slot = slotNameAt(idx);
-    auto* row = rowFromButton(sender);
     bool const hadData = slotIsFilled(slot);
 
+    this->retain();
     createQuickPopup(
         "Save Profile",
         hadData
@@ -345,10 +388,13 @@ void ProfileManagerPopup::onSaveSlot(cocos2d::CCObject* sender) {
               ),
         "Cancel",
         "Save",
-        [this, idx, row, slot](FLAlertLayer*, bool ok) {
+        [this, idx, slot](FLAlertLayer*, bool ok) {
+            ReleaseProfilePopup guard(this);
             if (!ok) return;
             snapshotIntoSlot(slot);
-            refreshRow(row, idx);
+            if (auto* row = findSlotRowForIndex(this, idx)) {
+                refreshRow(row, idx);
+            }
             Notification::create(
                 fmt::format("Saved to {}", slot),
                 NotificationIcon::Success,
@@ -359,10 +405,13 @@ void ProfileManagerPopup::onSaveSlot(cocos2d::CCObject* sender) {
 }
 
 void ProfileManagerPopup::onLoadSlot(cocos2d::CCObject* sender) {
-    auto const idx = indexFromSender(sender);
+    auto idxOpt = slotIndexFromSender(sender);
+    if (!idxOpt) return;
+    auto const idx = *idxOpt;
     auto const slot = slotNameAt(idx);
     if (!slotIsFilled(slot)) return;
 
+    this->retain();
     createQuickPopup(
         "Load Profile",
         fmt::format(
@@ -373,6 +422,7 @@ void ProfileManagerPopup::onLoadSlot(cocos2d::CCObject* sender) {
         "Cancel",
         "Load",
         [slot, this](FLAlertLayer*, bool ok) {
+            ReleaseProfilePopup guard(this);
             if (!ok) return;
             if (!applyProfileNow(slot)) {
                 Notification::create(
@@ -400,11 +450,13 @@ void ProfileManagerPopup::onLoadSlot(cocos2d::CCObject* sender) {
 }
 
 void ProfileManagerPopup::onClearSlot(cocos2d::CCObject* sender) {
-    auto const idx = indexFromSender(sender);
+    auto idxOpt = slotIndexFromSender(sender);
+    if (!idxOpt) return;
+    auto const idx = *idxOpt;
     auto const slot = slotNameAt(idx);
     if (!slotIsFilled(slot)) return;
 
-    auto* row = rowFromButton(sender);
+    this->retain();
     createQuickPopup(
         "Delete Profile",
         fmt::format(
@@ -414,10 +466,13 @@ void ProfileManagerPopup::onClearSlot(cocos2d::CCObject* sender) {
         ),
         "Cancel",
         "Delete",
-        [this, idx, row, slot](FLAlertLayer*, bool ok) {
+        [this, idx, slot](FLAlertLayer*, bool ok) {
+            ReleaseProfilePopup guard(this);
             if (!ok) return;
             clearSlot(slot);
-            refreshRow(row, idx);
+            if (auto* row = findSlotRowForIndex(this, idx)) {
+                refreshRow(row, idx);
+            }
             Notification::create(
                 fmt::format("Cleared {}", slot),
                 NotificationIcon::Info,
@@ -428,26 +483,35 @@ void ProfileManagerPopup::onClearSlot(cocos2d::CCObject* sender) {
 }
 
 void ProfileManagerPopup::onRenameSlot(cocos2d::CCObject* sender) {
-    auto const idx = indexFromSender(sender);
-    auto* row = rowFromButton(sender);
+    auto idxOpt = slotIndexFromSender(sender);
+    if (!idxOpt) return;
+    auto const idx = *idxOpt;
     auto current = slotNameAt(idx);
 
-    RenamePopup::create(
-        idx,
-        std::move(current),
-        [this, idx, row](std::string newName) {
-            auto res = renameSlot(idx, std::move(newName));
-            if (res.isErr()) {
-                Notification::create(
-                    res.unwrapErr(),
-                    NotificationIcon::Error,
-                    2.f
-                )->show();
-                return;
-            }
-            this->refreshRow(row, idx);
-        }
-    )->show();
+    this->retain();
+    if (auto* rename = RenamePopup::create(
+            idx,
+            std::move(current),
+            [this, idx](std::string newName) {
+                auto res = renameSlot(idx, std::move(newName));
+                if (res.isErr()) {
+                    Notification::create(
+                        res.unwrapErr(),
+                        NotificationIcon::Error,
+                        2.f
+                    )->show();
+                    return;
+                }
+                if (auto* row = findSlotRowForIndex(this, idx)) {
+                    refreshRow(row, idx);
+                }
+            },
+            [this]() { this->release(); }
+        )) {
+        rename->show();
+    } else {
+        this->release();
+    }
 }
 
 ProfileManagerPopup* ProfileManagerPopup::create() {

@@ -12,13 +12,15 @@ namespace profile {
 bool RenamePopup::init(
     std::size_t idx,
     std::string current,
-    std::function<void(std::string)> onAccept
+    std::function<void(std::string)> onAccept,
+    std::function<void()> onClosed
 ) {
     if (!Popup::init(280.f, 130.f, "GJ_square01.png")) {
         return false;
     }
     m_idx = idx;
     m_onAccept = std::move(onAccept);
+    m_onClosed = std::move(onClosed);
 
     this->setTitle("Rename Profile");
     this->setID("profile-rename-popup"_spr);
@@ -85,13 +87,22 @@ void RenamePopup::onAccept(cocos2d::CCObject*) {
     this->onClose(nullptr);
 }
 
+void RenamePopup::onClose(cocos2d::CCObject* sender) {
+    if (m_onClosed) {
+        m_onClosed();
+        m_onClosed = nullptr;
+    }
+    Popup::onClose(sender);
+}
+
 RenamePopup* RenamePopup::create(
     std::size_t idx,
     std::string current,
-    std::function<void(std::string)> onAccept
+    std::function<void(std::string)> onAccept,
+    std::function<void()> onClosed
 ) {
     auto* ret = new RenamePopup();
-    if (ret->init(idx, std::move(current), std::move(onAccept))) {
+    if (ret->init(idx, std::move(current), std::move(onAccept), std::move(onClosed))) {
         ret->autorelease();
         return ret;
     }
