@@ -22,6 +22,7 @@ Don't forget to save a profile after you add/remove a level from the ID filter!
 ## Currently logged actions
 
 Each of these can be turned on or off in the mod settings under **Notification Toggles**.
+There's also options to resize/disable sending screenshots
 
 - **Opening or exiting Geometry Dash** (with session time on close)
 - **Starting or exiting a level** (level name, creator, ID when available, and time in the run)

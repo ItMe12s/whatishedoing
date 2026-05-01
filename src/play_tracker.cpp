@@ -2,8 +2,11 @@
 #include <Geode/binding/GJGameLevel.hpp>
 #include <Geode/modify/PlayLayer.hpp>
 #include <Geode/utils/general.hpp>
+#include <Geode/utils/string.hpp>
 #include <cvolton.level-id-api/include/EditorIDs.hpp>
+#include <algorithm>
 #include <optional>
+#include <string>
 #include <vector>
 
 #include "embed_colors.hpp"
@@ -48,6 +51,22 @@ void queueStartposSegmentStart(PlayLayer* layer) {
         }
         applyStartposSegmentStart(layer);
     });
+}
+
+int clampedScreenshotScalePercent() {
+    return std::clamp(
+        static_cast<int>(
+            Mod::get()->getSettingValue<int64_t>("screenshot-scale-percent")
+        ),
+        25,
+        100
+    );
+}
+
+std::string screenshotEncodeTmpPath() {
+    return geode::utils::string::pathToString(
+        Mod::get()->getSaveDir() / "whatishedoing_cap_tmp.png"
+    );
 }
 
 void reopenLevelSessionIfNeeded(PlayLayer* layer) {
@@ -132,52 +151,74 @@ void sendDeathWebhookIfNeeded(
         session.deathNotified = true;
         return;
     }
-    std::optional<std::vector<std::uint8_t>> shot;
-    if (Mod::get()->getSettingValue<bool>("screenshot-death")) {
-        shot = capturePlayLayerScreenshotPng(layer);
+    int const deathStartPct = session.startPercent;
+    auto sendDeath =
+        [=, &session](std::optional<std::vector<std::uint8_t>> shot) {
+            if (fromStartpos) {
+                sendWebhookDirect(
+                    "Died",
+                    fmt::format(
+                        "{} got a **{}-{}%** run on **{}** by **{}**.",
+                        playerName,
+                        deathStartPct,
+                        currentPercent,
+                        display.levelName,
+                        display.creatorName
+                    ),
+                    embed_color::kDeath,
+                    {
+                        {"Level", display.levelName, true},
+                        {"Creator", display.creatorName, true},
+                        {"Run",
+                         fmt::format(
+                             "{}-{}%",
+                             deathStartPct,
+                             currentPercent
+                         ),
+                         true},
+                    },
+                    "",
+                    std::move(shot)
+                );
+            } else {
+                sendWebhookDirect(
+                    "Died",
+                    fmt::format(
+                        "{} died at **{}%** on **{}** by **{}**.",
+                        playerName,
+                        currentPercent,
+                        display.levelName,
+                        display.creatorName
+                    ),
+                    embed_color::kDeath,
+                    {
+                        {"Level", display.levelName, true},
+                        {"Creator", display.creatorName, true},
+                        {"Percent", fmt::format("{}%", currentPercent), true},
+                    },
+                    "",
+                    std::move(shot)
+                );
+            }
+            session.deathNotified = true;
+        };
+    if (!Mod::get()->getSettingValue<bool>("screenshot-death")) {
+        sendDeath(std::nullopt);
+        return;
     }
-    if (fromStartpos) {
-        int const startPct = session.startPercent;
-        sendWebhookDirect(
-            "Died",
-            fmt::format(
-                "{} got a **{}-{}%** run on **{}** by **{}**.",
-                playerName,
-                startPct,
-                currentPercent,
-                display.levelName,
-                display.creatorName
-            ),
-            embed_color::kDeath,
-            {
-                {"Level", display.levelName, true},
-                {"Creator", display.creatorName, true},
-                {"Run", fmt::format("{}-{}%", startPct, currentPercent), true},
-            },
-            "",
-            std::move(shot)
-        );
-    } else {
-        sendWebhookDirect(
-            "Died",
-            fmt::format(
-                "{} died at **{}%** on **{}** by **{}**.",
-                playerName,
-                currentPercent,
-                display.levelName,
-                display.creatorName
-            ),
-            embed_color::kDeath,
-            {
-                {"Level", display.levelName, true},
-                {"Creator", display.creatorName, true},
-                {"Percent", fmt::format("{}%", currentPercent), true},
-            },
-            "",
-            std::move(shot)
-        );
+    auto capOpt = capturePlayLayerScreenshotRgba(layer);
+    if (!capOpt) {
+        sendDeath(std::nullopt);
+        return;
     }
-    session.deathNotified = true;
+    spawnScreenshotEncodeToPngThen(
+        std::move(*capOpt),
+        clampedScreenshotScalePercent(),
+        screenshotEncodeTmpPath(),
+        [=, &session](std::optional<std::vector<std::uint8_t>> shot) {
+            sendDeath(std::move(shot));
+        }
+    );
 }
 
 void sendNewBestWebhookIfNeeded(PlayLayer* playLayer) {
@@ -223,27 +264,43 @@ void sendNewBestWebhookIfNeeded(PlayLayer* playLayer) {
         Mod::get()->getSettingValue<bool>("suppress-redacted")) {
         return;
     }
-    std::optional<std::vector<std::uint8_t>> shot;
-    if (Mod::get()->getSettingValue<bool>("screenshot-new-best")) {
-        shot = capturePlayLayerScreenshotPng(playLayer);
+    auto sendNewBest =
+        [=](std::optional<std::vector<std::uint8_t>> shot) {
+            sendWebhookDirect(
+                "New Best!",
+                fmt::format(
+                    "{} reached a new best of **{}%** on **{}** by **{}**.",
+                    playerName,
+                    currentBest,
+                    display.levelName,
+                    display.creatorName
+                ),
+                embed_color::kNewBest,
+                {
+                    {"Level", display.levelName, true},
+                    {"Creator", display.creatorName, true},
+                    {"Best", fmt::format("{}%", currentBest), true},
+                },
+                "",
+                std::move(shot)
+            );
+        };
+    if (!Mod::get()->getSettingValue<bool>("screenshot-new-best")) {
+        sendNewBest(std::nullopt);
+        return;
     }
-    sendWebhookDirect(
-        "New Best!",
-        fmt::format(
-            "{} reached a new best of **{}%** on **{}** by **{}**.",
-            playerName,
-            currentBest,
-            display.levelName,
-            display.creatorName
-        ),
-        embed_color::kNewBest,
-        {
-            {"Level", display.levelName, true},
-            {"Creator", display.creatorName, true},
-            {"Best", fmt::format("{}%", currentBest), true},
-        },
-        "",
-        std::move(shot)
+    auto capOpt = capturePlayLayerScreenshotRgba(playLayer);
+    if (!capOpt) {
+        sendNewBest(std::nullopt);
+        return;
+    }
+    spawnScreenshotEncodeToPngThen(
+        std::move(*capOpt),
+        clampedScreenshotScalePercent(),
+        screenshotEncodeTmpPath(),
+        [=](std::optional<std::vector<std::uint8_t>> shot) {
+            sendNewBest(std::move(shot));
+        }
     );
 }
 } // namespace
@@ -380,67 +437,108 @@ class $modify(MyPlayLayer, PlayLayer) {
         sendNewBestWebhookIfNeeded(this);
         bool const suppress = display.redacted &&
             Mod::get()->getSettingValue<bool>("suppress-redacted");
+        int const completeStartPercentSnapshot = pre.startPercent;
+        std::string const completeTitleSnapshot = pre.completeTitle();
         if (!suppress) {
             if (fromStartpos) {
                 auto const minSeg = static_cast<int>(
                     Mod::get()->getSettingValue<int64_t>(
                         "startpos-death-min-progress"
                     ));
-                int const progress = 100 - pre.startPercent;
+                int const progress = 100 - completeStartPercentSnapshot;
                 if (progress >= 0 && progress >= minSeg) {
-                    std::optional<std::vector<std::uint8_t>> shot;
-                    if (Mod::get()->getSettingValue<bool>(
+                    auto fireWebhook =
+                        [=](std::optional<std::vector<std::uint8_t>> shot) {
+                            sendWebhook(
+                                "notify-level-complete",
+                                "Startpos Complete!",
+                                fmt::format(
+                                    "{} got a **{}-{}%** run on **{}** by "
+                                    "**{}**.",
+                                    playerName,
+                                    completeStartPercentSnapshot,
+                                    100,
+                                    display.levelName,
+                                    display.creatorName
+                                ),
+                                completeColor,
+                                {
+                                    {"Level", display.levelName, true},
+                                    {"Creator", display.creatorName, true},
+                                    {"Run",
+                                     fmt::format(
+                                         "{}-100%",
+                                         completeStartPercentSnapshot
+                                     ),
+                                     true},
+                                },
+                                elapsed,
+                                std::move(shot)
+                            );
+                        };
+                    if (!Mod::get()->getSettingValue<bool>(
                             "screenshot-level-complete"
                         )) {
-                        shot = capturePlayLayerScreenshotPng(this);
+                        fireWebhook(std::nullopt);
+                    } else {
+                        auto capOpt =
+                            capturePlayLayerScreenshotRgba(this);
+                        if (!capOpt) {
+                            fireWebhook(std::nullopt);
+                        } else {
+                            spawnScreenshotEncodeToPngThen(
+                                std::move(*capOpt),
+                                clampedScreenshotScalePercent(),
+                                screenshotEncodeTmpPath(),
+                                [=](std::optional<
+                                    std::vector<std::uint8_t>> shot) {
+                                    fireWebhook(std::move(shot));
+                                }
+                            );
+                        }
                     }
-                    sendWebhook(
-                        "notify-level-complete",
-                        "Startpos Complete!",
-                        fmt::format(
-                            "{} got a **{}-{}%** run on **{}** by **{}**.",
-                            playerName,
-                            pre.startPercent,
-                            100,
-                            display.levelName,
-                            display.creatorName
-                        ),
-                        completeColor,
-                        {
-                            {"Level", display.levelName, true},
-                            {"Creator", display.creatorName, true},
-                            {"Run",
-                             fmt::format("{}-100%", pre.startPercent),
-                             true},
-                        },
-                        elapsed,
-                        std::move(shot)
-                    );
                 }
             } else {
-                std::optional<std::vector<std::uint8_t>> shot;
-                if (Mod::get()->getSettingValue<bool>(
+                auto fireWebhook =
+                    [=](std::optional<std::vector<std::uint8_t>> shot) {
+                        sendWebhook(
+                            "notify-level-complete",
+                            completeTitleSnapshot,
+                            fmt::format(
+                                "{} beat **{}** by **{}**!",
+                                playerName,
+                                display.levelName,
+                                display.creatorName
+                            ),
+                            completeColor,
+                            {
+                                {"Level", display.levelName, true},
+                                {"Creator", display.creatorName, true},
+                            },
+                            elapsed,
+                            std::move(shot)
+                        );
+                    };
+                if (!Mod::get()->getSettingValue<bool>(
                         "screenshot-level-complete"
                     )) {
-                    shot = capturePlayLayerScreenshotPng(this);
+                    fireWebhook(std::nullopt);
+                } else {
+                    auto capOpt = capturePlayLayerScreenshotRgba(this);
+                    if (!capOpt) {
+                        fireWebhook(std::nullopt);
+                    } else {
+                        spawnScreenshotEncodeToPngThen(
+                            std::move(*capOpt),
+                            clampedScreenshotScalePercent(),
+                            screenshotEncodeTmpPath(),
+                            [=](std::optional<
+                                std::vector<std::uint8_t>> shot) {
+                                fireWebhook(std::move(shot));
+                            }
+                        );
+                    }
                 }
-                sendWebhook(
-                    "notify-level-complete",
-                    pre.completeTitle(),
-                    fmt::format(
-                        "{} beat **{}** by **{}**!",
-                        playerName,
-                        display.levelName,
-                        display.creatorName
-                    ),
-                    completeColor,
-                    {
-                        {"Level", display.levelName, true},
-                        {"Creator", display.creatorName, true},
-                    },
-                    elapsed,
-                    std::move(shot)
-                );
             }
         }
         levelSession().reset();

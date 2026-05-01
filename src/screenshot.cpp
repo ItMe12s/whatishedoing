@@ -2,6 +2,7 @@
 
 #include <Geode/Geode.hpp>
 #include <Geode/modify/PlayLayer.hpp>
+#include <Geode/utils/async.hpp>
 #include <Geode/utils/file.hpp>
 #include <Geode/utils/general.hpp>
 #include <Geode/utils/string.hpp>
@@ -26,7 +27,7 @@ namespace {
 double lanczos2(double x) {
     constexpr double a = 2;
     // M_PI fans vs std::numbers::pi fans vs whatever float const pi = std::numbers::pi_v<float>; is
-    // - dank_meme01
+    // -dank_meme01
     double const pi = std::numbers::pi_v<double>;
     if (x == 0) {
         return 1;
@@ -133,9 +134,80 @@ std::vector<GLubyte> downscaleRgbaLanczos(
     return out;
 }
 
+std::optional<std::vector<std::uint8_t>> encodeRgbaToPngBytes(
+    std::vector<std::uint8_t> flippedRgba,
+    int pixelWidth,
+    int pixelHeight,
+    int pct,
+    std::string const& tmpStr
+) {
+    if (pixelWidth <= 0 || pixelHeight <= 0 || flippedRgba.empty()) {
+        return std::nullopt;
+    }
+
+    GLubyte* encodePixels =
+        reinterpret_cast<GLubyte*>(flippedRgba.data());
+    int encodeW = pixelWidth;
+    int encodeH = pixelHeight;
+    std::vector<GLubyte> scaledRgba;
+    if (pct < 100) {
+        double const f = static_cast<double>(pct) / 100.0;
+        int const dw = std::max(
+            1,
+            static_cast<int>(
+                std::floor(static_cast<double>(pixelWidth) * f)
+            )
+        );
+        int const dh = std::max(
+            1,
+            static_cast<int>(
+                std::floor(static_cast<double>(pixelHeight) * f)
+            )
+        );
+        if (dw < pixelWidth || dh < pixelHeight) {
+            scaledRgba = downscaleRgbaLanczos(
+                encodePixels,
+                pixelWidth,
+                pixelHeight,
+                dw,
+                dh
+            );
+            encodePixels = scaledRgba.data();
+            encodeW = dw;
+            encodeH = dh;
+        }
+    }
+
+    CCImage image{};
+    image.m_nBitsPerComponent = 8;
+    image.m_nWidth = encodeW;
+    image.m_nHeight = encodeH;
+    image.m_bHasAlpha = true;
+    image.m_bPreMulti = false;
+    image.m_pData = encodePixels;
+
+    bool const saved = image.saveToFile(tmpStr.c_str(), true);
+    image.m_pData = nullptr;
+    if (!saved) {
+        return std::nullopt;
+    }
+
+    auto readResult = geode::utils::file::readBinary(tmpStr);
+    std::error_code ec;
+    std::filesystem::remove(std::filesystem::path(tmpStr), ec);
+    if (!readResult.isOk()) {
+        return std::nullopt;
+    }
+    auto out = readResult.unwrap();
+    if (out.empty()) {
+        return std::nullopt;
+    }
+    return out;
+}
+
 } // namespace
 
-std::optional<std::vector<std::uint8_t>> capturePlayLayerScreenshotPng(
+std::optional<CapturedScreenshotRgba> capturePlayLayerScreenshotRgba(
     PlayLayer* playLayer
 ) {
     if (!playLayer) {
@@ -229,80 +301,43 @@ std::optional<std::vector<std::uint8_t>> capturePlayLayerScreenshotPng(
 
     auto const bufBytes =
         static_cast<size_t>(pixelWidth) * static_cast<size_t>(pixelHeight) * 4;
-    auto flipped = std::make_unique<GLubyte[]>(bufBytes);
+    CapturedScreenshotRgba cap;
+    cap.width = pixelWidth;
+    cap.height = pixelHeight;
+    cap.rgba.resize(bufBytes);
     for (int i = 0; i < pixelHeight; ++i) {
         std::memcpy(
-            &flipped[static_cast<size_t>(i * pixelWidth * 4)],
-            &rawData[static_cast<size_t>((pixelHeight - i - 1) * pixelWidth * 4)],
+            cap.rgba.data() + static_cast<size_t>(i * pixelWidth * 4),
+            rawData.data()
+                + static_cast<size_t>((pixelHeight - i - 1) * pixelWidth * 4),
             static_cast<size_t>(pixelWidth * 4)
         );
     }
 
-    int const pct = std::clamp(
-        static_cast<int>(
-            Mod::get()->getSettingValue<int64_t>("screenshot-scale-percent")
-        ),
-        25,
-        100
-    );
+    return cap;
+}
 
-    std::vector<GLubyte> scaledRgba;
-    GLubyte* encodePixels = flipped.get();
-    int encodeW = pixelWidth;
-    int encodeH = pixelHeight;
-    if (pct < 100) {
-        double const f = static_cast<double>(pct) / 100.0;
-        int const dw = std::max(
-            1,
-            static_cast<int>(
-                std::floor(static_cast<double>(pixelWidth) * f)
-            )
+void spawnScreenshotEncodeToPngThen(
+    CapturedScreenshotRgba captured,
+    int scalePct,
+    std::string tmpPathStr,
+    std::function<void(std::optional<std::vector<std::uint8_t>> png)> onMainThread
+) {
+    geode::async::runtime().spawnBlocking<void>([
+        cap = std::move(captured),
+        scalePct,
+        tmp = std::move(tmpPathStr),
+        cb = std::move(onMainThread)
+    ]() mutable {
+        auto png = encodeRgbaToPngBytes(
+            std::move(cap.rgba),
+            cap.width,
+            cap.height,
+            scalePct,
+            tmp
         );
-        int const dh = std::max(
-            1,
-            static_cast<int>(
-                std::floor(static_cast<double>(pixelHeight) * f)
-            )
-        );
-        if (dw < pixelWidth || dh < pixelHeight) {
-            scaledRgba = downscaleRgbaLanczos(
-                flipped.get(),
-                pixelWidth,
-                pixelHeight,
-                dw,
-                dh
-            );
-            encodePixels = scaledRgba.data();
-            encodeW = dw;
-            encodeH = dh;
-        }
-    }
-
-    CCImage image{};
-    image.m_nBitsPerComponent = 8;
-    image.m_nWidth = encodeW;
-    image.m_nHeight = encodeH;
-    image.m_bHasAlpha = true;
-    image.m_bPreMulti = false;
-    image.m_pData = encodePixels;
-
-    auto const tmpPath = Mod::get()->getSaveDir() / "whatishedoing_cap_tmp.png";
-    auto const tmpStr = geode::utils::string::pathToString(tmpPath);
-    bool const saved = image.saveToFile(tmpStr.c_str(), true);
-    image.m_pData = nullptr;
-    if (!saved) {
-        return std::nullopt;
-    }
-
-    auto readResult = geode::utils::file::readBinary(tmpStr);
-    std::error_code ec;
-    std::filesystem::remove(tmpPath, ec);
-    if (!readResult.isOk()) {
-        return std::nullopt;
-    }
-    auto out = readResult.unwrap();
-    if (out.empty()) {
-        return std::nullopt;
-    }
-    return out;
+        geode::queueInMainThread([cb = std::move(cb), png = std::move(png)]() mutable {
+            cb(std::move(png));
+        });
+    });
 }
