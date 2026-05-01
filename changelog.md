@@ -1,4 +1,9 @@
-# 1.1.3
+# 1.2.0
+
+- Screenshots
+- Fixed some UI issues
+
+## 1.1.3
 
 - 4 extra webhook urls per profile
 
@@ -18,7 +23,7 @@
 ## 1.0.7
 
 - Startpos level complete message
-- Fix **New Best** webhook during startpos bug
+- Fixed **New Best** webhook during startpos bug
 
 ## 1.0.6
 
