@@ -1,6 +1,10 @@
-# 1.2.0
+# 1.2.1
 
-- Screenshots
+- Made the webhook display name optional
+
+## 1.2.0
+
+- Configurable screenshots
 - Fixed some UI issues
 
 ## 1.1.3
