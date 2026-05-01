@@ -9,28 +9,42 @@
 #include <cocos2d.h>
 
 #include <algorithm>
+#include <array>
 #include <cmath>
 #include <cstring>
 #include <filesystem>
 #include <memory>
+#include <numbers>
 #include <vector>
 
 using namespace geode::prelude;
 using namespace cocos2d;
 
+// Found this gem on https://www.kevincao.xyz/posts/image-resizing
 namespace {
 
-GLubyte clampU8(float x) {
-    if (x <= 0.f) {
-        return 0;
+double lanczos2(double x) {
+    constexpr double a = 2;
+    // M_PI fans vs std::numbers::pi fans vs whatever float const pi = std::numbers::pi_v<float>; is
+    // - dank_meme01
+    double const pi = std::numbers::pi_v<double>;
+    if (x == 0) {
+        return 1;
     }
-    if (x >= 255.f) {
-        return 255;
+    if (-a <= x && x < a) {
+        return a * std::sin(pi * x) * std::sin(pi * x / a)
+            / (pi * pi * x * x);
     }
-    return static_cast<GLubyte>(x + 0.5f);
+    return 0;
 }
 
-std::vector<GLubyte> downscaleRgbaBilinear(
+struct LanczosKernelEntry {
+    int lo = 0;
+    int hi = 0;
+    std::array<double, 6> weights{};
+};
+
+std::vector<GLubyte> downscaleRgbaLanczos(
     GLubyte const* src,
     int sw,
     int sh,
@@ -40,34 +54,79 @@ std::vector<GLubyte> downscaleRgbaBilinear(
     std::vector<GLubyte> out(
         static_cast<size_t>(dw) * static_cast<size_t>(dh) * 4
     );
-    float const sx = static_cast<float>(sw) / static_cast<float>(dw);
-    float const sy = static_cast<float>(sh) / static_cast<float>(dh);
+    double const zoomX = static_cast<double>(dw) / static_cast<double>(sw);
+    double const zoomY = static_cast<double>(dh) / static_cast<double>(sh);
+
+    std::vector<LanczosKernelEntry> weightsYs(static_cast<size_t>(dh));
     for (int y = 0; y < dh; ++y) {
-        float const fy =
-            (static_cast<float>(y) + 0.5f) * sy - 0.5f;
-        int const y0 = std::clamp(static_cast<int>(std::floor(fy)), 0, sh - 1);
-        int const y1 = std::clamp(y0 + 1, 0, sh - 1);
-        float const wy = fy - static_cast<float>(y0);
+        double const srcY = static_cast<double>(y) / zoomY;
+        int lo = static_cast<int>(std::ceil(srcY - 3));
+        if (lo < 0) {
+            lo = 0;
+        }
+        int hi = static_cast<int>(std::floor(srcY + 3 - 1e-6));
+        if (hi > sh - 1) {
+            hi = sh - 1;
+        }
+        weightsYs[static_cast<size_t>(y)].lo = lo;
+        weightsYs[static_cast<size_t>(y)].hi = hi;
+        for (int y_ = lo; y_ <= hi; ++y_) {
+            weightsYs[static_cast<size_t>(y)].weights[static_cast<size_t>(y_ - lo)]
+                = lanczos2(static_cast<double>(y_) - srcY);
+        }
+    }
+
+    std::vector<LanczosKernelEntry> weightsXs(static_cast<size_t>(dw));
+    for (int x = 0; x < dw; ++x) {
+        double const srcX = static_cast<double>(x) / zoomX;
+        int lo = static_cast<int>(std::ceil(srcX - 3));
+        if (lo < 0) {
+            lo = 0;
+        }
+        int hi = static_cast<int>(std::floor(srcX + 3 - 1e-6));
+        if (hi > sw - 1) {
+            hi = sw - 1;
+        }
+        weightsXs[static_cast<size_t>(x)].lo = lo;
+        weightsXs[static_cast<size_t>(x)].hi = hi;
+        for (int x_ = lo; x_ <= hi; ++x_) {
+            weightsXs[static_cast<size_t>(x)].weights[static_cast<size_t>(x_ - lo)]
+                = lanczos2(static_cast<double>(x_) - srcX);
+        }
+    }
+
+    for (int y = 0; y < dh; ++y) {
+        LanczosKernelEntry const& ky = weightsYs[static_cast<size_t>(y)];
         for (int x = 0; x < dw; ++x) {
-            float const fx =
-                (static_cast<float>(x) + 0.5f) * sx - 0.5f;
-            int const x0 = std::clamp(static_cast<int>(std::floor(fx)), 0, sw - 1);
-            int const x1 = std::clamp(x0 + 1, 0, sw - 1);
-            float const wx = fx - static_cast<float>(x0);
-            auto sample = [&](int xi, int yi) -> GLubyte const* {
-                return &src[static_cast<size_t>(yi * sw + xi) * 4];
-            };
-            GLubyte const* c00 = sample(x0, y0);
-            GLubyte const* c10 = sample(x1, y0);
-            GLubyte const* c01 = sample(x0, y1);
-            GLubyte const* c11 = sample(x1, y1);
-            for (int c = 0; c < 4; ++c) {
-                float const v =
-                    (1.f - wx) * (1.f - wy) * static_cast<float>(c00[c]) +
-                    wx * (1.f - wy) * static_cast<float>(c10[c]) +
-                    (1.f - wx) * wy * static_cast<float>(c01[c]) +
-                    wx * wy * static_cast<float>(c11[c]);
-                out[static_cast<size_t>(y * dw + x) * 4 + c] = clampU8(v);
+            LanczosKernelEntry const& kx = weightsXs[static_cast<size_t>(x)];
+            size_t const outI =
+                static_cast<size_t>(y * dw + x) * 4;
+            out[outI + 3] = 255;
+            for (int channel = 0; channel < 3; ++channel) {
+                double sum = 0;
+                double totalWeight = 0;
+                for (int y_ = ky.lo; y_ <= ky.hi; ++y_) {
+                    double const wy =
+                        ky.weights[static_cast<size_t>(y_ - ky.lo)];
+                    for (int x_ = kx.lo; x_ <= kx.hi; ++x_) {
+                        double const wx =
+                            kx.weights[static_cast<size_t>(x_ - kx.lo)];
+                        double const weight = wx * wy;
+                        sum += static_cast<double>(
+                                   src[static_cast<size_t>(y_ * sw + x_) * 4
+                                       + channel]
+                               )
+                            * weight;
+                        totalWeight += weight;
+                    }
+                }
+                int const outChannel =
+                    totalWeight > 0
+                        ? static_cast<int>(sum / totalWeight)
+                        : 0;
+
+                out[outI + static_cast<size_t>(channel)] =
+                    static_cast<GLubyte>(std::clamp(outChannel, 0, 255));
             }
         }
     }
@@ -206,7 +265,7 @@ std::optional<std::vector<std::uint8_t>> capturePlayLayerScreenshotPng(
             )
         );
         if (dw < pixelWidth || dh < pixelHeight) {
-            scaledRgba = downscaleRgbaBilinear(
+            scaledRgba = downscaleRgbaLanczos(
                 flipped.get(),
                 pixelWidth,
                 pixelHeight,
