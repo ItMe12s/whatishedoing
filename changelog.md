@@ -1,6 +1,6 @@
 # 1.3.0
 
-- New event: level upload/update (by [MalikHw47](https://youtube.com/@MalikHw47))
+- Level upload/update (by [MalikHw47](https://youtube.com/@MalikHw47))
 
 ## 1.2.2
 

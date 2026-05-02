@@ -1,5 +1,4 @@
 #include "rename_popup.hpp"
-#include "../state.hpp"
 
 #include <Geode/Geode.hpp>
 #include <Geode/binding/ButtonSprite.hpp>

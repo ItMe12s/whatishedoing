@@ -598,12 +598,14 @@ class $modify(MyPlayLayer, PlayLayer) {
         PlayLayer::onQuit();
     }
     void destroyPlayer(PlayerObject* player, GameObject* object) {
-        auto& game_session = gameSession();
-        if (game_session.eventCount < game_session.trackedEvents.size()) {
-            game_session.trackedEvents[game_session.eventCount++] = Tracked::Death;
-        }
         bool const trackDeath =
             Mod::get()->getSettingValue<bool>("notify-death");
+        if (trackDeath) {
+            auto& game_session = gameSession();
+            if (game_session.eventCount < game_session.trackedEvents.size()) {
+                game_session.trackedEvents[game_session.eventCount++] = Tracked::Death;
+            }
+        }
         int pctBefore = 0;
         int bestBefore = 0;
         if (trackDeath) {

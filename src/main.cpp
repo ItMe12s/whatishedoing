@@ -14,13 +14,14 @@
 #include "state.hpp"
 #include "webhook.hpp"
 
-#include <Geode/utils/web.hpp>
 #include <Geode/modify/UploadPopup.hpp>
+#include <filesystem>
 #include <fstream>
 #include <sstream>
 
 using namespace geode::prelude;
 
+// {lengh} and {length} both expand to the tier length string.
 static const char* DEFAULT_TEMPLATE = R"(## {isUploaded"New Level!"}{isUpdated"Level Updated!"}
 **{creator} {isUploaded"dropped a new"}{isUpdated"updated a"} level!**
 - Name: {name}
@@ -174,6 +175,8 @@ static std::string buildUploadMessage(GJGameLevel* level, bool isUpdate) {
     auto mod = Mod::get();
     bool rolePing   = mod->getSettingValue<bool>("upload-role-ping");
     std::string roleID  = mod->getSettingValue<std::string>("upload-role-id");
+    geode::utils::string::trimIP(roleID);
+    bool const wantRolePing = rolePing && !roleID.empty();
     std::string creator = level->m_creatorName;
     std::string name    = level->m_levelName;
     std::string id      = std::to_string((int)level->m_levelID);
@@ -195,16 +198,15 @@ static std::string buildUploadMessage(GJGameLevel* level, bool isUpdate) {
         replace("{name}",    name);
         replace("{id}",      id);
         replace("{lengh}",   length);
+        replace("{length}",  length);
         replace("{objects}", objects);
-        // role ping in custom text via {role}
-        replace("{role}", rolePing ? fmt::format("<@&{}>", roleID) : "");
+        replace("{role}", wantRolePing ? fmt::format("<@&{}>", roleID) : "");
         text = processConditionals(text, isUpdate);
     } else {
         text = isUpdate
             ? fmt::format("**{}** updated a level!\n- Name: {}\n- ID:   {}\n-# {} ({} objects)", creator, name, id, length, objects)
             : fmt::format("**{}** dropped a new level!\n- Name: {}\n- ID:  {}\n-# {} ({} objects)", creator, name, id, length, objects);
-        // role ping goes at the bottom spoilered in the preset
-        if (rolePing)
+        if (wantRolePing)
             text += fmt::format("\n||<@&{}>||", roleID);
     }
     return text;
@@ -227,18 +229,8 @@ class $modify(UploadPopup) {
 
         std::string content = buildUploadMessage(level, isUpdate);
         
-        // If using custom text, send as a simple content webhook
         if (mod->getSettingValue<bool>("upload-use-custom-text")) {
-            std::string webhookURL = mod->getSettingValue<std::string>("webhook-url");
-            if (webhookURL.empty()) return;
-            if (!webhookURL.starts_with("https://")) webhookURL = "https://" + webhookURL;
-
-            auto json = matjson::Value();
-            json["content"] = content;
-            auto req = web::WebRequest();
-            req.header("Content-Type", "application/json");
-            req.bodyJSON(json);
-            async::spawn(req.post(webhookURL));
+            sendWebhookContent(content);
         } else {
             // Otherwise use the mod's standard embed format
             sendWebhookDirect(
@@ -296,6 +288,15 @@ $execute
                 auto const playerName = getPlayerName();
                 auto const elapsed =
                     formatDuration(secondsSince(session.startTime));
+                std::string footer = elapsed;
+                auto const summary = formatSessionTrackedSummary(session);
+                if (!summary.empty()) {
+                    footer += "\nSession: " + summary;
+                    if (footer.size() > 2048) {
+                        footer.resize(2045);
+                        footer += "...";
+                    }
+                }
                 if (Mod::get()
                         ->getSettingValue<bool>("blocking-webhook")) {
                     sendWebhookDirectSync(
@@ -306,7 +307,7 @@ $execute
                         ),
                         embed_color::kGameClose,
                         {},
-                        elapsed
+                        footer
                     );
                 } else {
                     sendWebhookDirect(
@@ -317,7 +318,7 @@ $execute
                         ),
                         embed_color::kGameClose,
                         {},
-                        elapsed
+                        footer
                     );
                 }
             }
