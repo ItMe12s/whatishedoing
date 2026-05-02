@@ -1,4 +1,8 @@
-# 1.2.2
+# 1.3.0
+
+- Level upload/update (by [MalikHw47](https://youtube.com/@MalikHw47))
+
+## 1.2.2
 
 - **New Best** minimum percentage
 

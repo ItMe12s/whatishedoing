@@ -30,6 +30,7 @@ There's also options to resize/disable sending screenshots.
 - **Level complete** (different message for Normal, Practice, and Startpos runs)
 - **New best** (below 100% with configurable minimum)
 - **Opening or exiting the editor** (play test and exit paths that leave the editor)
+- **Level Upload or Update** (by [MalikHw47](https://youtube.com/@MalikHw47))
 
 ## Off by default / Community features
 

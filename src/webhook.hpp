@@ -42,3 +42,6 @@ void sendWebhook(
     std::string const& footer = "",
     std::optional<std::vector<std::uint8_t>> screenshotPng = std::nullopt
 );
+
+// Plain-message webhook (JSON content field only), all configured URLs and retries.
+void sendWebhookContent(std::string const& content);

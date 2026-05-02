@@ -431,7 +431,54 @@ void sendImpl(
     }
 }
 
+matjson::Value buildContentWebhookPayload(std::string const& content) {
+    auto payload = matjson::Value::object();
+    auto username = geode::utils::string::trim(
+        Mod::get()->getSettingValue<std::string>("webhook-username"));
+    if (!username.empty()) {
+        payload["username"] = std::move(username);
+    }
+    payload["content"] = content;
+    return payload;
+}
+
+void sendContentImpl(std::string const& content) {
+    auto urls = collectWebhookTargets();
+    if (urls.empty()) {
+        return;
+    }
+    auto maxRetries = static_cast<int>(
+        Mod::get()->getSettingValue<int64_t>("max-retries")
+    );
+    if (maxRetries < 0) {
+        maxRetries = 0;
+    }
+    auto base = buildContentWebhookPayload(content);
+    for (auto const& url : urls) {
+        postWebhookWithRetries(
+            url,
+            matjson::Value(base),
+            0,
+            maxRetries
+        );
+    }
+}
+
 } // namespace webhook_impl
+
+void sendWebhookContent(std::string const& content) {
+    std::string body = content;
+    constexpr size_t kMaxDiscordContent = 2000;
+    if (body.size() > kMaxDiscordContent) {
+        log::warn(
+            "Webhook message content truncated from {} to {} characters",
+            body.size(),
+            kMaxDiscordContent
+        );
+        body.resize(kMaxDiscordContent);
+    }
+    webhook_impl::sendContentImpl(body);
+}
 
 std::string formatDuration(int totalSeconds) {
     auto h = totalSeconds / 3600;

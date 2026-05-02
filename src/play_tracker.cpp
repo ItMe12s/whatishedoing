@@ -361,6 +361,10 @@ class $modify(MyPlayLayer, PlayLayer) {
         }
         auto const playerName = getPlayerName();
         if (!isContinuation) {
+            auto& game_session = gameSession();
+            if (game_session.eventCount < game_session.trackedEvents.size()) {
+                game_session.trackedEvents[game_session.eventCount++] = Tracked::LevelStart;
+            }
             auto const display = resolveLevelDisplay(
                 levelID,
                 levelName,
@@ -414,6 +418,10 @@ class $modify(MyPlayLayer, PlayLayer) {
         syncPlayMode(this);
     }
     void levelComplete() {
+        auto& game_session = gameSession();
+        if (game_session.eventCount < game_session.trackedEvents.size()) {
+            game_session.trackedEvents[game_session.eventCount++] = Tracked::LevelComplete;
+        }
         syncPlayMode(this);
         auto& pre = levelSession();
         if (!pre.active) {
@@ -547,6 +555,10 @@ class $modify(MyPlayLayer, PlayLayer) {
         levelSession().reset();
     }
     void onQuit() {
+        auto& game_session = gameSession();
+        if (game_session.eventCount < game_session.trackedEvents.size()) {
+            game_session.trackedEvents[game_session.eventCount++] = Tracked::LevelExit;
+        }
         auto& session = levelSession();
         if (!session.active) {
             PlayLayer::onQuit();
@@ -588,6 +600,12 @@ class $modify(MyPlayLayer, PlayLayer) {
     void destroyPlayer(PlayerObject* player, GameObject* object) {
         bool const trackDeath =
             Mod::get()->getSettingValue<bool>("notify-death");
+        if (trackDeath) {
+            auto& game_session = gameSession();
+            if (game_session.eventCount < game_session.trackedEvents.size()) {
+                game_session.trackedEvents[game_session.eventCount++] = Tracked::Death;
+            }
+        }
         int pctBefore = 0;
         int bestBefore = 0;
         if (trackDeath) {

@@ -1,6 +1,7 @@
 #pragma once
 
 #include <Geode/Geode.hpp>
+#include <array>
 #include <chrono>
 #include <cstdint>
 #include <string>
@@ -8,11 +9,32 @@
 using Clock = std::chrono::steady_clock;
 using Milliseconds = std::chrono::milliseconds;
 
+enum class Tracked {
+    LevelUpload,
+    LevelUpdate,
+    GameOpen,
+    GameClose,
+    LevelStart,
+    LevelExit,
+    LevelComplete,
+    NewBest,
+    EditorOpen,
+    EditorExit,
+    Death,
+    ProfileSave,
+    ProfileLoad,
+    CustomTextEdit,
+    TestWebhook,
+    Unknown
+};
+
 inline constexpr int kLevelSessionClearedId = -67;
 
 struct GameSession {
     Clock::time_point startTime;
     bool started = false;
+    std::array<Tracked, 25> trackedEvents{};
+    size_t eventCount = 0;
 };
 
 struct LevelSession {
@@ -49,6 +71,8 @@ struct EditorSession {
 GameSession& gameSession();
 LevelSession& levelSession();
 EditorSession& editorSession();
+
+std::string formatSessionTrackedSummary(GameSession const& session);
 
 std::string getPlayerName();
 std::string displayLevelName(std::string const& levelName);

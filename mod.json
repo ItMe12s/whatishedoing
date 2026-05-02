@@ -8,8 +8,11 @@
 	},
 	"id": "imes.whatishedoing",
 	"name": "What is he doing? (Webhook Logger)",
-	"version": "v1.2.2",
-	"developer": "imes",
+	"version": "v1.3.0",
+	"developers": [
+		"imes",
+		"MalikHw47"
+	],
 	"description": "Sends optional notifications based on your actions to a Discord webhook you configure.",
 	"dependencies": {
 		"cvolton.level-id-api": ">=v2.0.0",
@@ -204,6 +207,47 @@
 			"description": "Use the toggle button on the level info page to add/remove levels. Or do it the old way by making a list in a note app and copy pasting it here. It will automatically filter out text for you too (e.g. \"1 Stereo Madness, 2 Back On Track\" -> \"1, 2\").",
 			"default": "",
 			"filter": "0123456789, "
+		},
+		"notify-level-upload-title": {
+			"type": "title",
+			"name": "Level Upload Notification"
+		},
+		"notify-level-upload": {
+			"type": "bool",
+			"name": "Notify on Level Upload",
+			"description": "Log when you upload a new level",
+			"default": true
+		},
+		"upload-send-on-update": {
+			"type": "bool",
+			"name": "Send on Level Update",
+			"description": "Also send a notification when you update an existing level",
+			"default": true
+		},
+		"upload-use-custom-text": {
+			"type": "bool",
+			"name": "Use Custom Text",
+			"description": "Use your own message template from customtext.txt instead of the default embed.",
+			"default": false
+		},
+		"upload-open-custom-text": {
+			"type": "custom:open-file-button",
+			"name": "Custom Text",
+			"description": "Opens customtext.txt in your mod config folder. Variables: {creator}, {name}, {id}, {lengh}, {objects}, {role}, {isUploaded\"text\"}, {isUpdated\"text\"}",
+			"enable-if": "upload-use-custom-text"
+		},
+		"upload-role-ping": {
+			"type": "bool",
+			"name": "Role Ping",
+			"description": "Ping a role when a level is uploaded",
+			"default": false
+		},
+		"upload-role-id": {
+			"type": "string",
+			"name": "Role ID",
+			"description": "The Discord role ID to ping. In the preset this appears spoilered at the bottom. In custom text, place {role} wherever you want it!",
+			"default": "",
+			"filter": "0123456789"
 		},
 		"suppress-redacted": {
 			"type": "bool",
