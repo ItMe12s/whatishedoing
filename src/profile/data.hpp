@@ -9,14 +9,14 @@ namespace profile {
 
 enum class Kind { Bool, Int, String };
 
-struct Tracked {
+struct TrackedKey {
     char const* key;
     Kind kind;
 };
 
 constexpr std::size_t kSlotCount = 10;
 
-std::array<Tracked, 25> const& trackedKeys();
+std::array<TrackedKey, 31> const& trackedKeys();
 
 std::array<std::string, kSlotCount> slotNames();
 std::string slotNameAt(std::size_t idx);

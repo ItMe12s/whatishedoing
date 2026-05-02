@@ -1,0 +1,65 @@
+{
+    "geode": "5.6.1",
+    "gd": {
+        "win": "2.2081",
+        "mac": "2.2081",
+        "android": "2.2081",
+        "ios": "2.2081"
+    },
+    "version": "1.0.0",
+    "id": "malikhw47.didheuploadsmth",
+    "name": "Did He Upload Something!",
+    "developer": "MalikHw47",
+    "description": "Send a message to a Discord webhook at level upload!",
+    "tags": ["utility", "online"],
+    "links": {
+        "source": "https://github.com/MalikHw/Did-He-Uploaded-Some-Shit",
+        "community": "https://discord.gg/G9bZ92eg2n"
+    },
+    "settings": {
+        "enabled": {
+            "name": "Enabled",
+            "description": "toggle the notif on/off",
+            "type": "bool",
+            "default": true
+        },
+        "webhook-url": {
+            "name": "Webhook URL",
+            "description": "Discord webhook URL to send to",
+            "type": "string",
+            "default": "",
+            "filter": "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789!+-/:;',._?=%&<>*"
+        },
+        "send-on-update": {
+            "name": "Send on Level Update",
+            "description": "also send a webhook when you update an existing level",
+            "type": "bool",
+            "default": true
+        },
+        "use-custom-text": {
+            "name": "Use Custom Text",
+            "description": "Use your own message template from customtext.txt instead of the default one",
+            "type": "bool",
+            "default": false
+        },
+        "open-custom-text": {
+            "name": "Custom Text",
+            "description": "Opens customtext.txt(on windows) in your mod config folder. Variables: {creator}, {name}, {id}, {lengh}, {objects}, {role}, {isUploaded\"text\"}, {isUpdated\"text\"}",
+            "type": "custom:open-file-button",
+            "enable-if": "use-custom-text"
+        },
+        "role-ping": {
+            "name": "Role Ping",
+            "description": "ping a role when a message is sent",
+            "type": "bool",
+            "default": false
+        },
+        "role-id": {
+            "name": "Role ID",
+            "description": "the Discord role ID to ping. In the preset this appears spoilered at the bottom. In custom text, place {role} wherever you want it!",
+            "type": "string",
+            "default": "",
+            "filter": "1234567890"
+        }
+    }
+}

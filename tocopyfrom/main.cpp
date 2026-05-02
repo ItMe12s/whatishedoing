@@ -1,20 +1,6 @@
 #include <Geode/Geode.hpp>
-#include <Geode/loader/GameEvent.hpp>
-#include <Geode/loader/SettingV3.hpp>
-
-#ifdef GEODE_IS_WINDOWS
-#define WIN32_LEAN_AND_MEAN
-#include <windows.h>
-#include <shellapi.h>
-#endif
-
-#include "embed_colors.hpp"
-#include "profile/data.hpp"
-#include "profile/popup.hpp"
-#include "state.hpp"
-#include "webhook.hpp"
-
 #include <Geode/utils/web.hpp>
+#include <Geode/loader/SettingV3.hpp>
 #include <Geode/modify/UploadPopup.hpp>
 #include <fstream>
 #include <sstream>
@@ -93,10 +79,6 @@ protected:
 #else
         utils::file::openFolder(Mod::get()->getConfigDir());
 #endif
-        auto& session = gameSession();
-        if (session.eventCount < session.trackedEvents.size()) {
-            session.trackedEvents[session.eventCount++] = Tracked::CustomTextEdit;
-        }
     }
 
     void onCommit() override {}
@@ -126,7 +108,11 @@ SettingNodeV3* OpenFileButtonSettingV3::createNode(float width) {
     );
 }
 
-// Converts m_levelLength int to a readable string
+$on_mod(Loaded) {
+    (void)Mod::get()->registerCustomSettingType("open-file-button", &OpenFileButtonSettingV3::parse);
+}
+
+// Converts m_levelLength int to a readable string so i don't fuck out mid code
 static std::string lengthString(int len) {
     switch (len) {
         case 0: return "Tiny";
@@ -170,10 +156,10 @@ static std::string getCustomTextFromFile() {
 }
 
 // fills in all the template vars in the message
-static std::string buildUploadMessage(GJGameLevel* level, bool isUpdate) {
+static std::string buildMessage(GJGameLevel* level, bool isUpdate) {
     auto mod = Mod::get();
-    bool rolePing   = mod->getSettingValue<bool>("upload-role-ping");
-    std::string roleID  = mod->getSettingValue<std::string>("upload-role-id");
+    bool rolePing   = mod->getSettingValue<bool>("role-ping");
+    std::string roleID  = mod->getSettingValue<std::string>("role-id");
     std::string creator = level->m_creatorName;
     std::string name    = level->m_levelName;
     std::string id      = std::to_string((int)level->m_levelID);
@@ -181,7 +167,7 @@ static std::string buildUploadMessage(GJGameLevel* level, bool isUpdate) {
     std::string objects = std::to_string((int)level->m_objectCount);
     std::string text;
 
-    if (mod->getSettingValue<bool>("upload-use-custom-text")) {
+    if (mod->getSettingValue<bool>("use-custom-text")) {
         text = getCustomTextFromFile();
         // replace simple vars
         auto replace = [&](std::string const& from, std::string const& to) {
@@ -201,8 +187,8 @@ static std::string buildUploadMessage(GJGameLevel* level, bool isUpdate) {
         text = processConditionals(text, isUpdate);
     } else {
         text = isUpdate
-            ? fmt::format("**{}** updated a level!\n- Name: {}\n- ID:   {}\n-# {} ({} objects)", creator, name, id, length, objects)
-            : fmt::format("**{}** dropped a new level!\n- Name: {}\n- ID:  {}\n-# {} ({} objects)", creator, name, id, length, objects);
+            ? fmt::format("## Level Updated!\n{} Updated a level!\n- Name: {}\n- ID:   {}\n-# {} ({} objects)", creator, name, id, length, objects)
+            : fmt::format("## New Level!\n{} dropped a new level!\n- Name: {}\n- ID:  {}\n-# {} ({} objects)", creator, name, id, length, objects);
         // role ping goes at the bottom spoilered in the preset
         if (rolePing)
             text += fmt::format("\n||<@&{}>||", roleID);
@@ -210,152 +196,41 @@ static std::string buildUploadMessage(GJGameLevel* level, bool isUpdate) {
     return text;
 }
 
+// Fire and forget, sends the webhook, logs success/failure
+static void sendWebhook(GJGameLevel* level, bool isUpdate) {
+    if (!Mod::get()->getSettingValue<bool>("enabled")) return;
+    std::string webhookURL = Mod::get()->getSettingValue<std::string>("webhook-url");
+    if (webhookURL.empty()) {
+        log::warn("Webhook URL is empty, skipping");
+        return;
+    }
+    if (!webhookURL.starts_with("https://"))
+        webhookURL = "https://" + webhookURL;
+    auto json = matjson::Value();
+    json["content"] = buildMessage(level, isUpdate);
+    auto req = web::WebRequest();
+    req.header("Content-Type", "application/json");
+    req.bodyJSON(json);
+    // async::spawn
+    async::spawn(
+        req.post(webhookURL),
+        [](web::WebResponse res) {
+            if (res.ok()) {
+                log::info("Webhook sent successfully ({})", res.code());
+            } else {
+                log::warn("Webhook failed with status {}: {}",
+                    res.code(), res.string().unwrapOr("no body"));
+            }
+        }
+    );
+}
+
 class $modify(UploadPopup) {
     void levelUploadFinished(GJGameLevel* level) {
         UploadPopup::levelUploadFinished(level);
-        auto mod = Mod::get();
-        if (!mod->getSettingValue<bool>("notify-level-upload")) return;
-
         // m_levelVersion > 1 means the level already on the servers
         bool isUpdate = level->m_levelVersion > 1;
-        if (isUpdate && !mod->getSettingValue<bool>("upload-send-on-update")) return;
-
-        auto& session = gameSession();
-        if (session.eventCount < session.trackedEvents.size()) {
-            session.trackedEvents[session.eventCount++] = isUpdate ? Tracked::LevelUpdate : Tracked::LevelUpload;
-        }
-
-        std::string content = buildUploadMessage(level, isUpdate);
-        
-        // If using custom text, send as a simple content webhook
-        if (mod->getSettingValue<bool>("upload-use-custom-text")) {
-            std::string webhookURL = mod->getSettingValue<std::string>("webhook-url");
-            if (webhookURL.empty()) return;
-            if (!webhookURL.starts_with("https://")) webhookURL = "https://" + webhookURL;
-
-            auto json = matjson::Value();
-            json["content"] = content;
-            auto req = web::WebRequest();
-            req.header("Content-Type", "application/json");
-            req.bodyJSON(json);
-            async::spawn(req.post(webhookURL));
-        } else {
-            // Otherwise use the mod's standard embed format
-            sendWebhookDirect(
-                isUpdate ? "Level Updated" : "New Level Uploaded",
-                content,
-                isUpdate ? embed_color::kEditorExit : embed_color::kEditorOpen // Reuse some colors
-            );
-        }
+        if (isUpdate && !Mod::get()->getSettingValue<bool>("send-on-update")) return;
+        sendWebhook(level, isUpdate);
     }
 };
-
-$execute
-{
-    GameEvent(GameEventType::Loaded)
-        .listen(
-            [] {
-                auto& session = gameSession();
-                if (session.started) {
-                    return;
-                }
-                session.started = true;
-                session.startTime = Clock::now();
-                session.eventCount = 0;
-                if (session.eventCount < session.trackedEvents.size()) {
-                    session.trackedEvents[session.eventCount++] = Tracked::GameOpen;
-                }
-                auto const playerName = getPlayerName();
-                sendWebhook(
-                    "notify-game-session",
-                    "Opened Geometry Dash",
-                    fmt::format(
-                        "{} opened Geometry Dash!",
-                        playerName
-                    ),
-                    embed_color::kGameOpen
-                );
-            }
-        )
-        .leak();
-
-    GameEvent(GameEventType::Exiting)
-        .listen(
-            [] {
-                auto& session = gameSession();
-                if (!session.started) {
-                    return;
-                }
-                if (!Mod::get()
-                         ->getSettingValue<bool>("notify-game-session")) {
-                    return;
-                }
-                if (session.eventCount < session.trackedEvents.size()) {
-                    session.trackedEvents[session.eventCount++] = Tracked::GameClose;
-                }
-                auto const playerName = getPlayerName();
-                auto const elapsed =
-                    formatDuration(secondsSince(session.startTime));
-                if (Mod::get()
-                        ->getSettingValue<bool>("blocking-webhook")) {
-                    sendWebhookDirectSync(
-                        "Closed Geometry Dash",
-                        fmt::format(
-                            "{} closed Geometry Dash.",
-                            playerName
-                        ),
-                        embed_color::kGameClose,
-                        {},
-                        elapsed
-                    );
-                } else {
-                    sendWebhookDirect(
-                        "Closed Geometry Dash",
-                        fmt::format(
-                            "{} closed Geometry Dash.",
-                            playerName
-                        ),
-                        embed_color::kGameClose,
-                        {},
-                        elapsed
-                    );
-                }
-            }
-        )
-        .leak();
-}
-
-$on_mod(Loaded)
-{
-    (void)Mod::get()->registerCustomSettingType("open-file-button", &OpenFileButtonSettingV3::parse);
-
-    ButtonSettingPressedEventV3(Mod::get(), "profile-manager")
-        .listen(
-            [](std::string_view buttonKey) {
-                if (buttonKey == "manage") {
-                    profile::ProfileManagerPopup::create()->show();
-                }
-            }
-        )
-        .leak();
-
-    listenForSettingChanges<bool>("test-webhook", [](bool enabled) {
-        if (!enabled) {
-            return;
-        }
-        auto const playerName = getPlayerName();
-        auto& session = gameSession();
-        if (session.eventCount < session.trackedEvents.size()) {
-            session.trackedEvents[session.eventCount++] = Tracked::TestWebhook;
-        }
-        sendWebhookDirect(
-            "Test Webhook",
-            fmt::format(
-                "{} is testing the webhook!",
-                playerName
-            ),
-            embed_color::kTestWebhook
-        );
-        Mod::get()->setSettingValue<bool>("test-webhook", false);
-    });
-}

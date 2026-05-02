@@ -205,6 +205,47 @@
 			"default": "",
 			"filter": "0123456789, "
 		},
+		"notify-level-upload-title": {
+			"type": "title",
+			"name": "Level Upload Notification"
+		},
+		"notify-level-upload": {
+			"type": "bool",
+			"name": "Notify on Level Upload",
+			"description": "Log when you upload a new level",
+			"default": true
+		},
+		"upload-send-on-update": {
+			"type": "bool",
+			"name": "Send on Level Update",
+			"description": "Also send a notification when you update an existing level",
+			"default": true
+		},
+		"upload-use-custom-text": {
+			"type": "bool",
+			"name": "Use Custom Text",
+			"description": "Use your own message template from customtext.txt instead of the default embed.",
+			"default": false
+		},
+		"upload-open-custom-text": {
+			"type": "custom:open-file-button",
+			"name": "Custom Text",
+			"description": "Opens customtext.txt in your mod config folder. Variables: {creator}, {name}, {id}, {lengh}, {objects}, {role}, {isUploaded\"text\"}, {isUpdated\"text\"}",
+			"enable-if": "upload-use-custom-text"
+		},
+		"upload-role-ping": {
+			"type": "bool",
+			"name": "Role Ping",
+			"description": "Ping a role when a level is uploaded",
+			"default": false
+		},
+		"upload-role-id": {
+			"type": "string",
+			"name": "Role ID",
+			"description": "The Discord role ID to ping. In the preset this appears spoilered at the bottom. In custom text, place {role} wherever you want it!",
+			"default": "",
+			"filter": "0123456789"
+		},
 		"suppress-redacted": {
 			"type": "bool",
 			"name": "Don't Send Redacted Messages",
