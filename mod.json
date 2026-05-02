@@ -8,7 +8,7 @@
 	},
 	"id": "imes.whatishedoing",
 	"name": "What is he doing? (Webhook Logger)",
-	"version": "v1.3.2",
+	"version": "v1.3.0",
 	"developers": ["imes", "MalikHw47"],
 	"description": "Sends optional notifications based on your actions to a Discord webhook you configure.",
 	"dependencies": {
