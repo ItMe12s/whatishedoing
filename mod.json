@@ -9,10 +9,7 @@
 	"id": "imes.whatishedoing",
 	"name": "What is he doing? (Webhook Logger)",
 	"version": "v1.3.0",
-	"developers": [
-		"imes",
-		"MalikHw47"
-	],
+	"developer": "imes",
 	"description": "Sends optional notifications based on your actions to a Discord webhook you configure.",
 	"dependencies": {
 		"cvolton.level-id-api": ">=v2.0.0",
@@ -208,6 +205,12 @@
 			"default": "",
 			"filter": "0123456789, "
 		},
+		"suppress-redacted": {
+			"type": "bool",
+			"name": "Don't Send Redacted Messages",
+			"description": "When on, any level message that would otherwise be sent as \"Private level\" (because of the filter mode above) is dropped entirely instead of sent. Use this for full privacy on filtered levels. Affects level start, exit, complete, death, new best, and editor open/exit.",
+			"default": false
+		},
 		"notify-level-upload-title": {
 			"type": "title",
 			"name": "Level Upload Notification"
@@ -248,12 +251,6 @@
 			"description": "The Discord role ID to ping. In the preset this appears spoilered at the bottom. In custom text, place {role} wherever you want it!",
 			"default": "",
 			"filter": "0123456789"
-		},
-		"suppress-redacted": {
-			"type": "bool",
-			"name": "Don't Send Redacted Messages",
-			"description": "When on, any level message that would otherwise be sent as \"Private level\" (because of the filter mode above) is dropped entirely instead of sent. Use this for full privacy on filtered levels. Affects level start, exit, complete, death, new best, and editor open/exit.",
-			"default": false
 		},
 		"extra-webhook-urls-title": {
 			"type": "title",
