@@ -234,10 +234,13 @@
 			"default": false
 		},
 		"upload-open-custom-text": {
-			"type": "custom:open-file-button",
+			"type": "button",
 			"name": "Custom Text",
 			"description": "Opens customtext.txt in your mod config folder. Variables: {creator}, {name}, {id}, {lengh}, {objects}, {role}, {isUploaded\"text\"}, {isUpdated\"text\"}",
-			"enable-if": "upload-use-custom-text"
+			"enable-if": "upload-use-custom-text",
+			"buttons": {
+				"edit": "Edit File"
+			}
 		},
 		"upload-role-ping": {
 			"type": "bool",

@@ -96,14 +96,26 @@ $execute
 
 $on_mod(Loaded)
 {
-    level_upload::registerCustomSettings();
-
     ButtonSettingPressedEventV3(Mod::get(), "profile-manager")
         .listen(
             [](std::string_view buttonKey) {
                 if (buttonKey == "manage") {
                     profile::ProfileManagerPopup::create()->show();
                 }
+            }
+        )
+        .leak();
+
+    ButtonSettingPressedEventV3(Mod::get(), "upload-open-custom-text")
+        .listen(
+            [](std::string_view buttonKey) {
+                if (buttonKey != "edit") {
+                    return;
+                }
+                if (!Mod::get()->getSettingValue<bool>("upload-use-custom-text")) {
+                    return;
+                }
+                level_upload::openCustomTextFileFromSettings();
             }
         )
         .leak();

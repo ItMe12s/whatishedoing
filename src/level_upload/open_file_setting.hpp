@@ -2,6 +2,6 @@
 
 namespace level_upload {
 
-void registerCustomSettings();
+void openCustomTextFileFromSettings();
 
 } // namespace level_upload
