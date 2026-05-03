@@ -2,8 +2,6 @@
 
 #include "data.hpp"
 #include "rename_popup.hpp"
-#include "../state.hpp"
-
 #include <Geode/Geode.hpp>
 #include <Geode/loader/Loader.hpp>
 #include <Geode/binding/ButtonSprite.hpp>
@@ -394,10 +392,6 @@ void ProfileManagerPopup::onSaveSlot(cocos2d::CCObject* sender) {
             ReleaseProfilePopup guard(this);
             if (!ok) return;
             snapshotIntoSlot(slot);
-            auto& game_session = gameSession();
-            if (game_session.eventCount < game_session.trackedEvents.size()) {
-                game_session.trackedEvents[game_session.eventCount++] = Tracked::ProfileSave;
-            }
             if (auto* row = findSlotRowForIndex(this, idx)) {
                 refreshRow(row, idx);
             }
@@ -430,10 +424,6 @@ void ProfileManagerPopup::onLoadSlot(cocos2d::CCObject* sender) {
         [slot, this](FLAlertLayer*, bool ok) {
             ReleaseProfilePopup guard(this);
             if (!ok) return;
-            auto& game_session = gameSession();
-            if (game_session.eventCount < game_session.trackedEvents.size()) {
-                game_session.trackedEvents[game_session.eventCount++] = Tracked::ProfileLoad;
-            }
             if (!applyProfileNow(slot)) {
                 Notification::create(
                     "Profile load failed",

@@ -11,8 +11,6 @@
 #include <shellapi.h>
 #endif
 
-#include "state.hpp"
-
 using namespace geode::prelude;
 
 namespace level_upload {
@@ -25,10 +23,6 @@ void openCustomTextFileFromSettings() {
 #else
     utils::file::openFolder(Mod::get()->getConfigDir());
 #endif
-    auto& session = gameSession();
-    if (session.eventCount < session.trackedEvents.size()) {
-        session.trackedEvents[session.eventCount++] = Tracked::CustomTextEdit;
-    }
 }
 
 } // namespace level_upload

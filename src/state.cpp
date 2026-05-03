@@ -68,44 +68,6 @@ void EditorSession::reset() {
     creatorName.clear();
 }
 
-namespace {
-
-char const* trackedLabel(Tracked t) {
-    switch (t) {
-    case Tracked::LevelUpload: return "Lvl upload";
-    case Tracked::LevelUpdate: return "Lvl update";
-    case Tracked::GameOpen: return "GD open";
-    case Tracked::GameClose: return "GD close";
-    case Tracked::LevelStart: return "Lvl start";
-    case Tracked::LevelExit: return "Lvl exit";
-    case Tracked::LevelComplete: return "Complete";
-    case Tracked::NewBest: return "New best";
-    case Tracked::EditorOpen: return "Editor";
-    case Tracked::EditorExit: return "Editor exit";
-    case Tracked::Death: return "Death";
-    case Tracked::ProfileSave: return "Profile save";
-    case Tracked::ProfileLoad: return "Profile load";
-    case Tracked::CustomTextEdit: return "Custom text";
-    case Tracked::TestWebhook: return "Test";
-    case Tracked::Unknown: break;
-    }
-    return "?";
-}
-
-} // namespace
-
-std::string formatSessionTrackedSummary(GameSession const& session) {
-    if (session.eventCount == 0) {
-        return "";
-    }
-    std::vector<std::string> parts;
-    parts.reserve(session.eventCount);
-    for (size_t i = 0; i < session.eventCount; ++i) {
-        parts.emplace_back(trackedLabel(session.trackedEvents[i]));
-    }
-    return geode::utils::string::join(parts, ", ");
-}
-
 GameSession& gameSession() {
     return s_gameSession;
 }

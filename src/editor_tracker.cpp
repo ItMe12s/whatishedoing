@@ -13,10 +13,6 @@ using namespace geode::prelude;
 
 namespace {
 void sendEditorExitWebhook(std::string const& actionTitle) {
-    auto& game_session = gameSession();
-    if (game_session.eventCount < game_session.trackedEvents.size()) {
-        game_session.trackedEvents[game_session.eventCount++] = Tracked::EditorExit;
-    }
     levelSession().reset();
     auto& session = editorSession();
     if (!session.active) {
@@ -69,10 +65,6 @@ class $modify(MyLevelEditorLayer, LevelEditorLayer) {
             return true;
         }
         levelSession().reset();
-        auto& game_session = gameSession();
-        if (game_session.eventCount < game_session.trackedEvents.size()) {
-            game_session.trackedEvents[game_session.eventCount++] = Tracked::EditorOpen;
-        }
         auto& session = editorSession();
         session.startTime = Clock::now();
         auto const levelID = EditorIDs::getID(level);

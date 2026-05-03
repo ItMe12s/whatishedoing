@@ -3,7 +3,6 @@
 #include <Geode/modify/UploadPopup.hpp>
 
 #include "embed_colors.hpp"
-#include "state.hpp"
 #include "webhook.hpp"
 
 using namespace geode::prelude;
@@ -16,11 +15,6 @@ class $modify(UploadPopup) {
 
         bool isUpdate = level->m_levelVersion > 1;
         if (isUpdate && !mod->getSettingValue<bool>("upload-send-on-update")) return;
-
-        auto& session = gameSession();
-        if (session.eventCount < session.trackedEvents.size()) {
-            session.trackedEvents[session.eventCount++] = isUpdate ? Tracked::LevelUpdate : Tracked::LevelUpload;
-        }
 
         std::string content = level_upload::buildUploadMessage(level, isUpdate);
 
