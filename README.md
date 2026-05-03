@@ -2,6 +2,11 @@
 
 A Discord webhook logger for actions in Geometry Dash such as playing a level or editing one.
 
+## Roadmap (Procrastinating)
+
+* ID filter for upload/update
+* All of the issues/feature request on GitHub
+
 ## Resources
 
 * [Geode SDK Documentation](https://docs.geode-sdk.org/)
