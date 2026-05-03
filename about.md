@@ -32,7 +32,7 @@ There's also options to resize/disable sending screenshots.
 - **Opening or exiting the editor** (play test and exit paths that leave the editor)
 - **Level Upload or Update** (by [MalikHw47](https://youtube.com/@MalikHw47))
 
-## Off by default / Community features
+## Community features
 
 These are under **Other Notification Toggles** and below it.
 

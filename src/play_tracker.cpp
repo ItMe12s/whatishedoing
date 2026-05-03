@@ -17,6 +17,11 @@ using namespace geode::prelude;
 
 namespace {
 
+bool shouldSuppressNoclipPlayWebhooks() {
+    return Mod::get()->getSettingValue<bool>("ignore-noclip-runs")
+        && levelSession().noclipSuspected;
+}
+
 void syncPlayMode(PlayLayer* layer) {
     auto& session = levelSession();
     session.practice = layer->m_isPracticeMode;
@@ -77,6 +82,7 @@ void reopenLevelSessionIfNeeded(PlayLayer* layer) {
     session.startPercent =
         static_cast<int>(level->m_normalPercent.value());
     session.bestNotifiedPercent = session.startPercent;
+    session.noclipSuspected = false;
     syncPlayMode(layer);
     if (layer->m_isTestMode) {
         queueStartposSegmentStart(layer);
@@ -90,6 +96,9 @@ void sendDeathWebhookIfNeeded(
 ) {
     auto& session = levelSession();
     if (!session.active || !layer || !layer->m_level) {
+        return;
+    }
+    if (shouldSuppressNoclipPlayWebhooks()) {
         return;
     }
     if (session.deathNotified) {
@@ -225,6 +234,9 @@ void sendNewBestWebhookIfNeeded(PlayLayer* playLayer) {
     if (!Mod::get()->getSettingValue<bool>("notify-new-best")) {
         return;
     }
+    if (shouldSuppressNoclipPlayWebhooks()) {
+        return;
+    }
     if (!playLayer || !playLayer->m_level) {
         return;
     }
@@ -343,6 +355,7 @@ class $modify(MyPlayLayer, PlayLayer) {
         } else {
             session.accumulated = Milliseconds::zero();
             session.levelID = levelID;
+            session.noclipSuspected = false;
         }
         session.attemptStart = Clock::now();
         session.levelName = levelName;
@@ -401,6 +414,7 @@ class $modify(MyPlayLayer, PlayLayer) {
             queueStartposSegmentStart(this);
         }
         levelSession().deathNotified = false;
+        levelSession().noclipSuspected = false;
     }
     void togglePracticeMode(bool practiceMode) {
         PlayLayer::togglePracticeMode(practiceMode);
@@ -444,7 +458,7 @@ class $modify(MyPlayLayer, PlayLayer) {
             Mod::get()->getSettingValue<bool>("suppress-redacted");
         int const completeStartPercentSnapshot = pre.startPercent;
         std::string const completeTitleSnapshot = pre.completeTitle();
-        if (!suppress) {
+        if (!suppress && !shouldSuppressNoclipPlayWebhooks()) {
             if (fromStartpos) {
                 auto const minSeg = static_cast<int>(
                     Mod::get()->getSettingValue<int64_t>(
@@ -563,7 +577,7 @@ class $modify(MyPlayLayer, PlayLayer) {
         );
         bool const suppress = display.redacted &&
             Mod::get()->getSettingValue<bool>("suppress-redacted");
-        if (!suppress) {
+        if (!suppress && !shouldSuppressNoclipPlayWebhooks()) {
             sendWebhook(
                 session.settingKey(),
                 session.exitTitle(),
@@ -586,6 +600,13 @@ class $modify(MyPlayLayer, PlayLayer) {
         PlayLayer::onQuit();
     }
     void destroyPlayer(PlayerObject* player, GameObject* object) {
+        if (Mod::get()->getSettingValue<bool>("ignore-noclip-runs")
+            && object == m_anticheatSpike) {
+            levelSession().noclipSuspected = true;
+            PlayLayer::destroyPlayer(player, object);
+            syncPlayMode(this);
+            return;
+        }
         bool const trackDeath =
             Mod::get()->getSettingValue<bool>("notify-death");
         int pctBefore = 0;

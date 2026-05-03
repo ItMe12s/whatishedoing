@@ -211,6 +211,12 @@
 			"description": "Normal mode only. Startpos: minimum segment, start-end percentage line. Skips when New Best already covers that death.",
 			"default": false
 		},
+		"ignore-noclip-runs": {
+			"type": "bool",
+			"name": "Ignore Noclip Runs",
+			"description": "If enabled, deaths by anticheat spike (e.g. noclip) mark the session as cheated and no webhooks are sent until a reset or new session. Not all cheats detected, there are rare false positives.",
+			"default": true
+		},
 		"death-min-percent": {
 			"type": "int",
 			"name": "Minimum Death Percent",
