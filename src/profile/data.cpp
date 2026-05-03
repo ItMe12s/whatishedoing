@@ -13,6 +13,7 @@ namespace {
 
 constexpr char const* kProfileDataKey = "profile-data";
 constexpr char const* kProfileNamesKey = "profile-names";
+constexpr char const* kActiveCustomTextSlotKey = "active-custom-text-slot";
 constexpr std::size_t kMaxNameLength = 32;
 
 std::array<TrackedKey, 30> const kTracked{{
@@ -228,6 +229,26 @@ bool applyProfileNow(std::string const& slot) {
     }
     log::info("Applied profile '{}'", slot);
     return true;
+}
+
+std::size_t activeCustomTextSlotIndex() {
+    int64_t const raw =
+        Mod::get()->getSavedValue<int64_t>(kActiveCustomTextSlotKey);
+    if (raw < 0 || static_cast<std::size_t>(raw) >= kSlotCount) {
+        return 0;
+    }
+    return static_cast<std::size_t>(raw);
+}
+
+void setActiveCustomTextSlotIndex(std::size_t idx) {
+    if (idx >= kSlotCount) {
+        idx = 0;
+    }
+    Mod::get()->setSavedValue<int64_t>(
+        kActiveCustomTextSlotKey,
+        static_cast<int64_t>(idx)
+    );
+    (void)Mod::get()->saveData();
 }
 
 } // namespace profile

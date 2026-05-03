@@ -1,5 +1,7 @@
 #include "custom_text.hpp"
 
+#include "profile/data.hpp"
+
 #include <Geode/Geode.hpp>
 #include <Geode/utils/file.hpp>
 
@@ -22,7 +24,9 @@ char const* kDefaultTemplate = R"(## {isUploaded"New Level!"}{isUpdated"Level Up
 } // namespace
 
 std::filesystem::path customTextFilePath() {
-    return Mod::get()->getConfigDir() / "customtext.txt";
+    auto const n = profile::activeCustomTextSlotIndex() + 1;
+    return Mod::get()->getConfigDir() /
+        fmt::format("customtextprofile{}.txt", n);
 }
 
 void ensureDefaultCustomTextFile() {

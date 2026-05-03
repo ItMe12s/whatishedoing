@@ -140,13 +140,13 @@
 		"upload-use-custom-text": {
 			"type": "bool",
 			"name": "Use Custom Text",
-			"description": "Use your own message template from customtext.txt instead of the default embed.",
+			"description": "Use your own message template instead of the default embed. Template file is customtextprofile1.txt through customtextprofile10.txt (see Manage Profiles). Slot 1 is used until you Load a profile from the manager, which switches which file is edited and used.",
 			"default": false
 		},
 		"upload-open-custom-text": {
 			"type": "button",
 			"name": "Custom Text",
-			"description": "Opens customtext.txt in your mod config folder. Variables: {creator}, {name}, {id}, {lengh}, {objects}, {role}, {isUploaded\"text\"}, {isUpdated\"text\"}",
+			"description": "Opens the active template file (customtextprofile1.txt ... customtextprofile10.txt) in your mod config folder. Load a profile in Manage Profiles to change which slot is active. Variables: {creator}, {name}, {id}, {lengh}, {objects}, {role}, {isUploaded\"text\"}, {isUpdated\"text\"}",
 			"enable-if": "upload-use-custom-text",
 			"buttons": {
 				"edit": "Edit File"

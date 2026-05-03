@@ -421,7 +421,7 @@ void ProfileManagerPopup::onLoadSlot(cocos2d::CCObject* sender) {
         ),
         "Cancel",
         "Load",
-        [slot, this](FLAlertLayer*, bool ok) {
+        [slot, this, idx](FLAlertLayer*, bool ok) {
             ReleaseProfilePopup guard(this);
             if (!ok) return;
             if (!applyProfileNow(slot)) {
@@ -432,6 +432,7 @@ void ProfileManagerPopup::onLoadSlot(cocos2d::CCObject* sender) {
                 )->show();
                 return;
             }
+            setActiveCustomTextSlotIndex(idx);
             auto* scene =
                 CCDirector::sharedDirector()->getRunningScene();
             if (auto* settings = findGeodeBaseSettingsPopup(scene)) {
@@ -470,6 +471,9 @@ void ProfileManagerPopup::onClearSlot(cocos2d::CCObject* sender) {
             ReleaseProfilePopup guard(this);
             if (!ok) return;
             clearSlot(slot);
+            if (activeCustomTextSlotIndex() == idx) {
+                setActiveCustomTextSlotIndex(0);
+            }
             if (auto* row = findSlotRowForIndex(this, idx)) {
                 refreshRow(row, idx);
             }

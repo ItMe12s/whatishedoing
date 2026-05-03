@@ -28,4 +28,7 @@ geode::Result<> renameSlot(std::size_t idx, std::string newName);
 
 bool applyProfileNow(std::string const& slot);
 
+std::size_t activeCustomTextSlotIndex();
+void setActiveCustomTextSlotIndex(std::size_t idx);
+
 } // namespace profile

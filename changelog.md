@@ -1,6 +1,7 @@
 # 1.3.0
 
-- Level upload/update (by [MalikHw47](https://youtube.com/@MalikHw47))
+- Level upload/update notifications (by [MalikHw47](https://youtube.com/@MalikHw47))
+- Per-slot custom text for upload/update notifications
 
 ## 1.2.2
 

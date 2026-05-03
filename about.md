@@ -15,9 +15,9 @@ On this mod's settings page, open **Manage Profiles** to work with up to 10 name
 Don't forget to save a profile after you add/remove a level from the ID filter!
 
 - **Save** stores a snapshot of your **last-applied** mod settings into that slot.
-- **Load** applies a saved slot and closes open settings popups so values apply cleanly.
+- **Load** applies a saved slot, updates the active custom text file, and closes settings popups. Slot 1's file is used until you load another.
 - **Rename** changes the slot's display name.
-- **Delete** clears saved data for that slot.
+- **Delete** clears that slot. If its custom text slot was active, slot 1's file becomes active.
 
 ## Currently logged actions
 
