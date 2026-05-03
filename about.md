@@ -30,13 +30,14 @@ There's also options to resize/disable sending screenshots.
 - **Level complete** (different message for Normal, Practice, and Startpos runs)
 - **New best** (below 100% with configurable minimum)
 - **Opening or exiting the editor** (play test and exit paths that leave the editor)
-- **Level Upload or Update** (by [MalikHw47](https://youtube.com/@MalikHw47))
+- **Level Upload or Update** (this isn't filtered by blacklist/whitelist yet) (by [MalikHw47](https://youtube.com/@MalikHw47))
 
 ## Community features
 
 These are under **Other Notification Toggles** and below it.
 
 - **Death** (dying after a configured percentage) (requested by Theitha)
+- **Ignore noclip runs** (Don't send webhooks when noclip is detected) (help from [axiom-S25u](https://github.com/axiom-S25u))
 - **Level ID filter** (All/Blacklist/Whitelist. Online levels use the check beside Favorite and Settings, Editor/local uses the check beside the level info button) (requested by many people)
 - **Startpos progress** (minimum percentage from your startpos until death or completion, applies to death messages and **Startpos Complete**) (requested by Manscapers Discord server)
 - **Extra URL slots** (In case you want to like let 5 servers/channels know what you're doing)
