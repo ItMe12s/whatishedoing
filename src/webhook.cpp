@@ -24,6 +24,40 @@ constexpr auto kSyncRequestTimeout = std::chrono::seconds(3);
 constexpr int kSyncMaxRetries = 1;
 constexpr int kSyncMaxRetryDelaySeconds = 2;
 
+constexpr size_t kDiscordEmbedTitleMax = 256;
+constexpr size_t kDiscordEmbedDescriptionMax = 4096;
+constexpr size_t kDiscordEmbedFieldNameMax = 256;
+constexpr size_t kDiscordEmbedFieldValueMax = 1024;
+constexpr size_t kDiscordEmbedFooterMax = 2048;
+constexpr size_t kDiscordWebhookUsernameMax = 80;
+constexpr size_t kDiscordEmbedFieldCountMax = 25;
+
+static std::string clampUtf8ByBytes(
+    std::string s,
+    size_t maxBytes,
+    char const* ctx
+) {
+    if (s.size() <= maxBytes) {
+        return s;
+    }
+    log::warn("{} truncated from {} to {} bytes", ctx, s.size(), maxBytes);
+    s.resize(maxBytes);
+    while (!s.empty() &&
+           (static_cast<unsigned char>(s.back()) & 0xc0) == 0x80) {
+        s.pop_back();
+    }
+    return s;
+}
+
+static bool isAllowedDiscordWebhookHost(std::string const& hostLower) {
+    return hostLower == "discord.com" || hostLower == "discordapp.com" ||
+        hostLower == "canary.discord.com" || hostLower == "ptb.discord.com";
+}
+
+static bool pathHasDiscordWebhookPrefix(std::string const& url) {
+    return url.find("/api/webhooks/") != std::string::npos;
+}
+
 // Returns nullopt if the URL is missing or not suitable for a Discord
 // webhook POST.
 std::optional<std::string> normalizeWebhookUrl(std::string const& raw) {
@@ -32,6 +66,35 @@ std::optional<std::string> normalizeWebhookUrl(std::string const& raw) {
     if (url.empty()) return std::nullopt;
     if (url.rfind("https://", 0) != 0) {
         log::warn("Webhook URL must start with https://");
+        return std::nullopt;
+    }
+    if (!pathHasDiscordWebhookPrefix(url)) {
+        log::warn(
+            "Webhook URL must include Discord path /api/webhooks/"
+        );
+        return std::nullopt;
+    }
+    size_t const hostStart = 8;
+    size_t pathStart = url.find('/', hostStart);
+    if (pathStart == std::string::npos) {
+        log::warn("Webhook URL missing path after host");
+        return std::nullopt;
+    }
+    std::string host = url.substr(hostStart, pathStart - hostStart);
+    if (auto const at = host.rfind('@'); at != std::string::npos) {
+        host = host.substr(at + 1);
+    }
+    if (auto const colon = host.find(':'); colon != std::string::npos) {
+        if (host.empty() || host.front() != '[') {
+            host = host.substr(0, colon);
+        }
+    }
+    host = geode::utils::string::toLower(std::move(host));
+    if (!isAllowedDiscordWebhookHost(host)) {
+        log::warn(
+            "Webhook URL host must be discord.com, discordapp.com, "
+            "canary.discord.com, or ptb.discord.com"
+        );
         return std::nullopt;
     }
     return url;
@@ -85,24 +148,58 @@ matjson::Value buildWebhookPayload(
     std::string const& footer,
     bool embedScreenshotAttachment
 ) {
+    auto const titleClamped = clampUtf8ByBytes(
+        title,
+        kDiscordEmbedTitleMax,
+        "webhook embed title"
+    );
+    auto const descClamped = clampUtf8ByBytes(
+        description,
+        kDiscordEmbedDescriptionMax,
+        "webhook embed description"
+    );
+    auto const footerClamped = clampUtf8ByBytes(
+        footer,
+        kDiscordEmbedFooterMax,
+        "webhook embed footer"
+    );
+
     auto fieldsArr = matjson::Value::array();
-    for (auto const& f : fields) {
+    size_t const nFields =
+        std::min(fields.size(), kDiscordEmbedFieldCountMax);
+    if (fields.size() > kDiscordEmbedFieldCountMax) {
+        log::warn(
+            "Webhook embed fields truncated from {} to {}",
+            fields.size(),
+            kDiscordEmbedFieldCountMax
+        );
+    }
+    for (size_t i = 0; i < nFields; ++i) {
+        auto const& f = fields[i];
         auto obj = matjson::Value::object();
-        obj["name"] = f.name;
-        obj["value"] = f.value;
+        obj["name"] = clampUtf8ByBytes(
+            f.name,
+            kDiscordEmbedFieldNameMax,
+            "webhook embed field name"
+        );
+        obj["value"] = clampUtf8ByBytes(
+            f.value,
+            kDiscordEmbedFieldValueMax,
+            "webhook embed field value"
+        );
         obj["inline"] = f.inlineField;
         fieldsArr.push(obj);
     }
 
     auto embed = matjson::Value::object();
-    embed["title"] = title;
-    embed["description"] = description;
+    embed["title"] = titleClamped;
+    embed["description"] = descClamped;
     embed["color"] = color;
     embed["fields"] = fieldsArr;
     embed["timestamp"] = currentIso8601Utc();
-    if (!footer.empty()) {
+    if (!footerClamped.empty()) {
         auto footerObj = matjson::Value::object();
-        footerObj["text"] = footer;
+        footerObj["text"] = footerClamped;
         embed["footer"] = footerObj;
     }
     if (embedScreenshotAttachment) {
@@ -118,7 +215,11 @@ matjson::Value buildWebhookPayload(
     auto username = geode::utils::string::trim(
         Mod::get()->getSettingValue<std::string>("webhook-username"));
     if (!username.empty()) {
-        payload["username"] = std::move(username);
+        payload["username"] = clampUtf8ByBytes(
+            std::move(username),
+            kDiscordWebhookUsernameMax,
+            "webhook username override"
+        );
     }
     payload["embeds"] = embedsArr;
     return payload;
@@ -436,7 +537,11 @@ matjson::Value buildContentWebhookPayload(std::string const& content) {
     auto username = geode::utils::string::trim(
         Mod::get()->getSettingValue<std::string>("webhook-username"));
     if (!username.empty()) {
-        payload["username"] = std::move(username);
+        payload["username"] = clampUtf8ByBytes(
+            std::move(username),
+            kDiscordWebhookUsernameMax,
+            "webhook username override"
+        );
     }
     payload["content"] = content;
     return payload;

@@ -15,13 +15,14 @@
 #include "webhook.hpp"
 
 #include <Geode/modify/UploadPopup.hpp>
+#include <Geode/utils/file.hpp>
+#include <Geode/utils/general.hpp>
+#include <Geode/utils/string.hpp>
 #include <filesystem>
-#include <fstream>
-#include <sstream>
+#include <system_error>
 
 using namespace geode::prelude;
 
-// {lengh} and {length} both expand to the tier length string.
 static const char* DEFAULT_TEMPLATE = R"(## {isUploaded"New Level!"}{isUpdated"Level Updated!"}
 **{creator} {isUploaded"dropped a new"}{isUpdated"updated a"} level!**
 - Name: {name}
@@ -29,7 +30,6 @@ static const char* DEFAULT_TEMPLATE = R"(## {isUploaded"New Level!"}{isUpdated"L
 -# {lengh} ({objects} objects)
 ||{role}||)";
 
-// button setting that opens customtext.txt in notepad (windows) or the config folder (other)
 class OpenFileButtonSettingV3 : public SettingV3 {
 public:
     static Result<std::shared_ptr<SettingV3>> parse(
@@ -86,9 +86,10 @@ protected:
 
     void onButton(CCObject*) {
         auto path = Mod::get()->getConfigDir() / "customtext.txt";
-        // create the file with a default template if it doesn't exist yet
-        if (!std::filesystem::exists(path))
-            std::ofstream(path) << DEFAULT_TEMPLATE;
+        std::error_code ec;
+        if (!std::filesystem::exists(path, ec)) {
+            (void)geode::utils::file::writeString(path, DEFAULT_TEMPLATE);
+        }
 #ifdef GEODE_IS_WINDOWS
         ShellExecuteW(nullptr, L"open", L"notepad.exe", path.wstring().c_str(), nullptr, SW_SHOW);
 #else
@@ -127,7 +128,6 @@ SettingNodeV3* OpenFileButtonSettingV3::createNode(float width) {
     );
 }
 
-// Converts m_levelLength int to a readable string
 static std::string lengthString(int len) {
     switch (len) {
         case 0: return "Tiny";
@@ -163,14 +163,15 @@ static std::string processConditionals(std::string text, bool isUpdate) {
 // reads customtext.txt from config dir, creates it with a default template if missing
 static std::string getCustomTextFromFile() {
     auto path = Mod::get()->getConfigDir() / "customtext.txt";
-    if (!std::filesystem::exists(path))
-        std::ofstream(path) << DEFAULT_TEMPLATE;
-    std::ostringstream ss;
-    ss << std::ifstream(path).rdbuf();
-    return ss.str();
+    std::error_code ec;
+    if (!std::filesystem::exists(path, ec)) {
+        (void)geode::utils::file::writeString(path, DEFAULT_TEMPLATE);
+    }
+    auto res = geode::utils::file::readString(path);
+    if (res.isOk()) return res.unwrap();
+    return std::string(DEFAULT_TEMPLATE);
 }
 
-// fills in all the template vars in the message
 static std::string buildUploadMessage(GJGameLevel* level, bool isUpdate) {
     auto mod = Mod::get();
     bool rolePing   = mod->getSettingValue<bool>("upload-role-ping");
@@ -179,20 +180,15 @@ static std::string buildUploadMessage(GJGameLevel* level, bool isUpdate) {
     bool const wantRolePing = rolePing && !roleID.empty();
     std::string creator = level->m_creatorName;
     std::string name    = level->m_levelName;
-    std::string id      = std::to_string((int)level->m_levelID);
+    std::string id      = geode::utils::numToString((int)level->m_levelID);
     std::string length  = lengthString(level->m_levelLength);
-    std::string objects = std::to_string((int)level->m_objectCount);
+    std::string objects = geode::utils::numToString((int)level->m_objectCount);
     std::string text;
 
     if (mod->getSettingValue<bool>("upload-use-custom-text")) {
         text = getCustomTextFromFile();
-        // replace simple vars
-        auto replace = [&](std::string const& from, std::string const& to) {
-            size_t pos = 0;
-            while ((pos = text.find(from, pos)) != std::string::npos) {
-                text.replace(pos, from.size(), to);
-                pos += to.size();
-            }
+        auto replace = [&](std::string_view from, std::string_view to) {
+            geode::utils::string::replaceIP(text, from, to);
         };
         replace("{creator}", creator);
         replace("{name}",    name);
@@ -232,11 +228,10 @@ class $modify(UploadPopup) {
         if (mod->getSettingValue<bool>("upload-use-custom-text")) {
             sendWebhookContent(content);
         } else {
-            // Otherwise use the mod's standard embed format
             sendWebhookDirect(
                 isUpdate ? "Level Updated" : "New Level Uploaded",
                 content,
-                isUpdate ? embed_color::kEditorExit : embed_color::kEditorOpen // Reuse some colors
+                isUpdate ? embed_color::kEditorExit : embed_color::kEditorOpen
             );
         }
     }

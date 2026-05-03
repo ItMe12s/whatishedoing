@@ -240,6 +240,7 @@ void ProfileManagerPopup::refreshRow(
     cocos2d::CCNode* row,
     std::size_t idx
 ) {
+    if (!row) return;
     auto const slot = slotNameAt(idx);
     bool const filled = slotIsFilled(slot);
 

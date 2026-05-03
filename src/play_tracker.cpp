@@ -259,7 +259,6 @@ void sendNewBestWebhookIfNeeded(PlayLayer* playLayer) {
     if (currentBest < minPct) {
         return;
     }
-    session.bestNotifiedPercent = currentBest;
     auto const playerName = getPlayerName();
     auto const display = resolveLevelDisplay(
         EditorIDs::getID(level),
@@ -270,6 +269,7 @@ void sendNewBestWebhookIfNeeded(PlayLayer* playLayer) {
         Mod::get()->getSettingValue<bool>("suppress-redacted")) {
         return;
     }
+    session.bestNotifiedPercent = currentBest;
     auto sendNewBest =
         [=](std::optional<std::vector<std::uint8_t>> shot) {
             sendWebhookDirect(

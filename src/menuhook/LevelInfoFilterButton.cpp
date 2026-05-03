@@ -12,6 +12,7 @@ struct WIHLevelInfoLayer : Modify<WIHLevelInfoLayer, LevelInfoLayer> {
         cocos2d::CCSprite* m_wihFilterInList = nullptr;
         cocos2d::CCSprite* m_wihFilterNotInList = nullptr;
         CCMenuItemSpriteExtra* m_wihFilterButton = nullptr;
+        int m_wihPlayVisibleTries = 0;
     };
 
     void wihRefreshFilterIcon() {
@@ -50,10 +51,20 @@ struct WIHLevelInfoLayer : Modify<WIHLevelInfoLayer, LevelInfoLayer> {
 
     void wihCheckIfPlayVisible(float) {
         if (!m_fields->m_wihFilterButton) {
+            this->unschedule(
+                schedule_selector(WIHLevelInfoLayer::wihCheckIfPlayVisible)
+            );
             return;
         }
         if (m_playBtnMenu && m_playBtnMenu->isVisible()) {
             m_fields->m_wihFilterButton->setVisible(true);
+            this->unschedule(
+                schedule_selector(WIHLevelInfoLayer::wihCheckIfPlayVisible)
+            );
+            return;
+        }
+        ++m_fields->m_wihPlayVisibleTries;
+        if (m_fields->m_wihPlayVisibleTries >= 180) {
             this->unschedule(
                 schedule_selector(WIHLevelInfoLayer::wihCheckIfPlayVisible)
             );
