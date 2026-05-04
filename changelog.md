@@ -1,12 +1,11 @@
 # 1.3.1
 
-- Removed **Ignore Noclip Runs** (it's broken rn and i will add it back later)
+- Removed **Ignore Noclip Runs** (it's broken on 1.3.0)
 
 ## 1.3.0
 
 - Level upload/update notifications (by [MalikHw47](https://youtube.com/@MalikHw47))
 - Per-slot custom text for upload/update notifications
-- Ignore noclip runs option (help from [axiom-S25u](https://github.com/axiom-S25u))
 
 ## 1.2.2
 
