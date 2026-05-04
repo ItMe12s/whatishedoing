@@ -1,4 +1,8 @@
-# 1.3.1
+# 1.4.0
+
+- New cheat detection system based on [Death Tracker](https://github.com/abb2k/death-tracker/)
+
+## 1.3.1
 
 - Removed **Ignore Noclip Runs** (it's broken on 1.3.0)
 

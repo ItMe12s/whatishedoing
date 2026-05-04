@@ -8,7 +8,7 @@
 	},
 	"id": "imes.whatishedoing",
 	"name": "What is he doing? (Webhook Logger)",
-	"version": "v1.3.1",
+	"version": "v1.4.0",
 	"developer": "imes",
 	"description": "Sends optional notifications based on your actions to a Discord webhook you configure.",
 	"dependencies": {
@@ -210,6 +210,12 @@
 			"name": "Notify on Death",
 			"description": "Normal mode only. Startpos: minimum segment, start-end percentage line. Skips when New Best already covers that death.",
 			"default": false
+		},
+		"cheat-detect": {
+			"type": "bool",
+			"name": "Detect Cheat/Noclip Runs",
+			"description": "Suppress progress webhooks when noclip, ignore damage, or speedhack is detected.",
+			"default": true
 		},
 		"death-min-percent": {
 			"type": "int",

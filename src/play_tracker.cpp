@@ -3,6 +3,8 @@
 #include <Geode/modify/PlayLayer.hpp>
 #include <Geode/utils/general.hpp>
 #include <Geode/utils/string.hpp>
+#include <cmath>
+#include <deque>
 #include <cvolton.level-id-api/include/EditorIDs.hpp>
 #include <optional>
 #include <string>
@@ -317,9 +319,118 @@ void sendNewBestWebhookIfNeeded(PlayLayer* playLayer) {
         }
     );
 }
+
+void markCurrentBestHandled(PlayLayer* playLayer) {
+    if (!playLayer || !playLayer->m_level) {
+        return;
+    }
+    if (playLayer->m_isTestMode && !playLayer->m_isPracticeMode) {
+        return;
+    }
+    auto* level = playLayer->m_level;
+    auto& session = levelSession();
+    if (!session.active) {
+        return;
+    }
+    if (session.levelID != EditorIDs::getID(level)) {
+        return;
+    }
+    if (session.practice) {
+        return;
+    }
+    int const currentBest =
+        static_cast<int>(level->m_newNormalPercent2.value());
+    if (currentBest > session.bestNotifiedPercent) {
+        session.bestNotifiedPercent = currentBest;
+    }
+}
 } // namespace
 
 class $modify(MyPlayLayer, PlayLayer) {
+    struct Fields {
+        bool noclip = false;
+        bool speedhack = false;
+        CCObject* disabledCheat = nullptr;
+        std::optional<Clock::time_point> speedhackCompare;
+        std::deque<double> realTimeHistory;
+        std::deque<double> gameTimeHistory;
+        double rollingRealSum = 0;
+        double rollingGameSum = 0;
+        double currentTimeWarp = 1;
+    };
+
+    static void onModify(auto& self) {
+        (void)self.setHookPriorityPre("PlayLayer::destroyPlayer", Priority::First);
+    }
+
+    void resetSpeedhackSamples() {
+        m_fields->realTimeHistory.clear();
+        m_fields->gameTimeHistory.clear();
+        m_fields->rollingRealSum = 0;
+        m_fields->rollingGameSum = 0;
+        m_fields->speedhackCompare = std::nullopt;
+    }
+
+    void clearCheatState() {
+        m_fields->noclip = false;
+        m_fields->speedhack = false;
+        m_fields->disabledCheat = nullptr;
+        resetSpeedhackSamples();
+    }
+
+    bool isProgressLegal() {
+        if (!Mod::get()->getSettingValue<bool>("cheat-detect")) {
+            return true;
+        }
+        return !m_fields->noclip
+            && !m_isIgnoreDamageEnabled
+            && !m_ignoreDamage
+            && !m_fields->speedhack;
+    }
+
+    void checkSpeedhackDelta(float dt) {
+        if (!m_player1 || m_player1->m_isDead || m_isPaused) {
+            return;
+        }
+        auto const now = Clock::now();
+        if (!m_fields->speedhackCompare.has_value()) {
+            m_fields->speedhackCompare = now;
+            return;
+        }
+        std::chrono::duration<double> const realElapsed =
+            now - m_fields->speedhackCompare.value();
+        m_fields->speedhackCompare = now;
+        double const realDt = realElapsed.count();
+        if (realDt > 0.2) {
+            return;
+        }
+        double const gameDt = static_cast<double>(dt);
+        m_fields->rollingRealSum += realDt;
+        m_fields->rollingGameSum += gameDt;
+        m_fields->realTimeHistory.push_back(realDt);
+        m_fields->gameTimeHistory.push_back(gameDt);
+        constexpr std::size_t kMaxSamples = 120;
+        if (m_fields->realTimeHistory.size() > kMaxSamples) {
+            m_fields->rollingRealSum -= m_fields->realTimeHistory.front();
+            m_fields->rollingGameSum -= m_fields->gameTimeHistory.front();
+            m_fields->realTimeHistory.pop_front();
+            m_fields->gameTimeHistory.pop_front();
+        }
+        if (m_fields->realTimeHistory.size() < 30 ||
+            m_fields->rollingRealSum == 0) {
+            return;
+        }
+        double const currentRatio =
+            m_fields->rollingGameSum / m_fields->rollingRealSum;
+        double const expectedRatio = m_fields->currentTimeWarp;
+        if (std::abs(currentRatio - expectedRatio) > 0.05) {
+            if (!m_fields->speedhack) {
+                log::warn("Speedhack detected");
+                m_fields->speedhack = true;
+            }
+        }
+    }
+
     bool init(
         GJGameLevel* level,
         bool useReplay,
@@ -404,12 +515,14 @@ class $modify(MyPlayLayer, PlayLayer) {
         return true;
     }
     void resetLevel() {
+        resetSpeedhackSamples();
         PlayLayer::resetLevel();
         reopenLevelSessionIfNeeded(this);
         if (m_isTestMode && m_level) {
             queueStartposSegmentStart(this);
         }
         levelSession().deathNotified = false;
+        clearCheatState();
     }
     void togglePracticeMode(bool practiceMode) {
         PlayLayer::togglePracticeMode(practiceMode);
@@ -452,14 +565,22 @@ class $modify(MyPlayLayer, PlayLayer) {
         auto const sessionAttemptStart = pre.attemptStart;
         std::string const completeTitleSnapshot = pre.completeTitle();
         PlayLayer::levelComplete();
-        sendNewBestWebhookIfNeeded(this);
+        bool const progressLegal = isProgressLegal();
+        if (progressLegal) {
+            sendNewBestWebhookIfNeeded(this);
+        } else {
+            markCurrentBestHandled(this);
+        }
         bool const suppress = display.redacted &&
             Mod::get()->getSettingValue<bool>("suppress-redacted");
-        if (!suppress) {
+        if (!suppress && progressLegal) {
             if (fromStartpos) {
                 auto* layer = this;
                 geode::queueInMainThread(
                     [=] {
+                        if (!progressLegal) {
+                            return;
+                        }
                         if (!matchesLevelSession(
                                 sessionLevelID,
                                 sessionLevelName,
@@ -549,6 +670,7 @@ class $modify(MyPlayLayer, PlayLayer) {
                         }
                     }
                 );
+                clearCheatState();
                 return;
             } else {
                 auto fireWebhook =
@@ -592,6 +714,7 @@ class $modify(MyPlayLayer, PlayLayer) {
                 }
             }
         }
+        clearCheatState();
         levelSession().reset();
     }
     void onQuit() {
@@ -646,10 +769,33 @@ class $modify(MyPlayLayer, PlayLayer) {
                 : 0;
         }
         PlayLayer::destroyPlayer(player, object);
+        resetSpeedhackSamples();
+        if (!m_fields->disabledCheat) {
+            m_fields->disabledCheat = object;
+        }
+        if (!m_fields->noclip && m_fields->disabledCheat != object &&
+            player && !player->m_isDead && !m_levelEndAnimationStarted) {
+            log::warn("Noclip detected");
+            m_fields->noclip = true;
+        }
         syncPlayMode(this);
-        sendNewBestWebhookIfNeeded(this);
-        if (trackDeath) {
+        bool const progressLegal = isProgressLegal();
+        if (progressLegal) {
+            sendNewBestWebhookIfNeeded(this);
+        } else {
+            markCurrentBestHandled(this);
+        }
+        if (trackDeath && progressLegal) {
             sendDeathWebhookIfNeeded(this, pctBefore, bestBefore);
         }
+    }
+    void postUpdate(float dt) {
+        checkSpeedhackDelta(dt);
+        PlayLayer::postUpdate(dt);
+    }
+    void updateTimeWarp(float timeWarp) {
+        PlayLayer::updateTimeWarp(timeWarp);
+        m_fields->currentTimeWarp = timeWarp;
+        resetSpeedhackSamples();
     }
 };
