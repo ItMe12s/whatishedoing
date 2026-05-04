@@ -389,6 +389,14 @@ class $modify(MyPlayLayer, PlayLayer) {
     }
 
     void checkSpeedhackDelta(float dt) {
+        if (!Mod::get()->getSettingValue<bool>("cheat-detect")) {
+            resetSpeedhackSamples();
+            return;
+        }
+        if (!levelSession().active || m_levelEndAnimationStarted) {
+            resetSpeedhackSamples();
+            return;
+        }
         if (!m_player1 || m_player1->m_isDead || m_isPaused) {
             return;
         }
@@ -405,6 +413,9 @@ class $modify(MyPlayLayer, PlayLayer) {
             return;
         }
         double const gameDt = static_cast<double>(dt);
+        if (realDt <= 0 || gameDt <= 0) {
+            return;
+        }
         m_fields->rollingRealSum += realDt;
         m_fields->rollingGameSum += gameDt;
         m_fields->realTimeHistory.push_back(realDt);
