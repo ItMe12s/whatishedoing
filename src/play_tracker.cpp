@@ -1,5 +1,8 @@
 #include <Geode/Geode.hpp>
+#include <Geode/binding/EndLevelLayer.hpp>
 #include <Geode/binding/GJGameLevel.hpp>
+#include <Geode/binding/PlayLayer.hpp>
+#include <Geode/modify/EndLevelLayer.hpp>
 #include <Geode/modify/PlayLayer.hpp>
 #include <Geode/utils/general.hpp>
 #include <Geode/utils/string.hpp>
@@ -18,6 +21,19 @@
 using namespace geode::prelude;
 
 namespace {
+
+struct PendingCompletedLevelExit {
+    PlayLayer* layer = nullptr;
+    int levelID = kLevelSessionClearedId;
+    std::string levelName;
+    std::string creatorName;
+    bool practice = false;
+    int64_t elapsedMs = 0;
+    Clock::time_point attemptStart;
+};
+
+std::optional<PendingCompletedLevelExit> s_pendingCompletedLevelExit;
+std::optional<PendingCompletedLevelExit> s_sentCompletedLevelExit;
 
 void syncPlayMode(PlayLayer* layer) {
     auto& session = levelSession();
@@ -320,6 +336,79 @@ void sendNewBestWebhookIfNeeded(PlayLayer* playLayer) {
     );
 }
 
+void queueCompletedLevelExit(
+    PlayLayer* layer,
+    LevelSession const& session,
+    int64_t elapsedMs
+) {
+    s_pendingCompletedLevelExit = PendingCompletedLevelExit{
+        layer,
+        session.levelID,
+        session.levelName,
+        session.creatorName,
+        session.practice,
+        elapsedMs,
+        session.attemptStart,
+    };
+}
+
+void clearCompletedLevelExit(PlayLayer* layer) {
+    if (s_pendingCompletedLevelExit &&
+        s_pendingCompletedLevelExit->layer == layer) {
+        s_pendingCompletedLevelExit.reset();
+    }
+    if (s_sentCompletedLevelExit &&
+        s_sentCompletedLevelExit->layer == layer) {
+        s_sentCompletedLevelExit.reset();
+    }
+}
+
+void sendCompletedLevelExitIfQueued(PlayLayer* layer) {
+    if (!s_pendingCompletedLevelExit ||
+        s_pendingCompletedLevelExit->layer != layer) {
+        return;
+    }
+    auto pending = std::move(*s_pendingCompletedLevelExit);
+    s_pendingCompletedLevelExit.reset();
+    s_sentCompletedLevelExit = pending;
+    auto const display = resolveLevelDisplay(
+        pending.levelID,
+        pending.levelName,
+        pending.creatorName
+    );
+    bool const suppress = display.redacted &&
+        Mod::get()->getSettingValue<bool>("suppress-redacted");
+    if (suppress) {
+        return;
+    }
+    auto const playerName = getPlayerName();
+    sendWebhook(
+        "notify-play-level",
+        pending.practice ? "Exited a Practice Run" : "Exited a Level",
+        fmt::format("{} exited **{}**.", playerName, display.levelName),
+        pending.practice ? embed_color::kPlayPractice : embed_color::kLevelExit,
+        {
+            {"Level", display.levelName, true},
+            {"Creator", display.creatorName, true},
+        },
+        formatDurationMs(pending.elapsedMs)
+    );
+}
+
+bool consumeSentCompletedLevelExit(PlayLayer* layer) {
+    if (!s_sentCompletedLevelExit ||
+        s_sentCompletedLevelExit->layer != layer) {
+        return false;
+    }
+    auto const& sent = *s_sentCompletedLevelExit;
+    if (!matchesLevelSession(sent.levelID, sent.levelName, sent.attemptStart)) {
+        return false;
+    }
+    s_sentCompletedLevelExit.reset();
+    levelSession().reset();
+    return true;
+}
+
 void markCurrentBestHandled(PlayLayer* playLayer) {
     if (!playLayer || !playLayer->m_level) {
         return;
@@ -447,6 +536,7 @@ class $modify(MyPlayLayer, PlayLayer) {
         bool useReplay,
         bool dontCreateObjects
     ) {
+        clearCompletedLevelExit(this);
         auto& session = levelSession();
         std::string const levelName =
             level ? std::string(level->m_levelName) : "";
@@ -558,8 +648,8 @@ class $modify(MyPlayLayer, PlayLayer) {
             pre.reset();
             return;
         }
-        auto const elapsed =
-            formatDurationMs(pre.elapsedMilliseconds());
+        auto const elapsedMs = pre.elapsedMilliseconds();
+        auto const elapsed = formatDurationMs(elapsedMs);
         auto const display = resolveLevelDisplay(
             EditorIDs::getID(m_level),
             std::string(m_level->m_levelName),
@@ -584,6 +674,9 @@ class $modify(MyPlayLayer, PlayLayer) {
         }
         bool const suppress = display.redacted &&
             Mod::get()->getSettingValue<bool>("suppress-redacted");
+        if (!suppress) {
+            queueCompletedLevelExit(this, pre, elapsedMs);
+        }
         if (!suppress && progressLegal) {
             if (fromStartpos) {
                 auto* layer = this;
@@ -731,6 +824,11 @@ class $modify(MyPlayLayer, PlayLayer) {
     void onQuit() {
         auto& session = levelSession();
         if (!session.active) {
+            clearCompletedLevelExit(this);
+            PlayLayer::onQuit();
+            return;
+        }
+        if (consumeSentCompletedLevelExit(this)) {
             PlayLayer::onQuit();
             return;
         }
@@ -765,6 +863,7 @@ class $modify(MyPlayLayer, PlayLayer) {
             );
         }
         session.reset();
+        clearCompletedLevelExit(this);
         PlayLayer::onQuit();
     }
     void destroyPlayer(PlayerObject* player, GameObject* object) {
@@ -808,5 +907,22 @@ class $modify(MyPlayLayer, PlayLayer) {
         PlayLayer::updateTimeWarp(timeWarp);
         m_fields->currentTimeWarp = timeWarp;
         resetSpeedhackSamples();
+    }
+};
+
+class $modify(MyEndLevelLayer, EndLevelLayer) {
+    void onMenu(CCObject* sender) {
+        sendCompletedLevelExitIfQueued(m_playLayer);
+        EndLevelLayer::onMenu(sender);
+    }
+
+    void onReplay(CCObject* sender) {
+        clearCompletedLevelExit(m_playLayer);
+        EndLevelLayer::onReplay(sender);
+    }
+
+    void onRestartCheckpoint(CCObject* sender) {
+        clearCompletedLevelExit(m_playLayer);
+        EndLevelLayer::onRestartCheckpoint(sender);
     }
 };
