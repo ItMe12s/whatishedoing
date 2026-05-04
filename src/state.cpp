@@ -59,7 +59,6 @@ void LevelSession::reset() {
     startPercent = 0;
     bestNotifiedPercent = 0;
     deathNotified = false;
-    noclipSuspected = false;
 }
 
 void EditorSession::reset() {

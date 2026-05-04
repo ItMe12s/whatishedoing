@@ -26,7 +26,6 @@ struct LevelSession {
     int startPercent = 0;
     int bestNotifiedPercent = 0;
     bool deathNotified = false;
-    bool noclipSuspected = false;
 
     int64_t elapsedMilliseconds() const;
     std::string settingKey() const;
