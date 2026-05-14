@@ -1,4 +1,8 @@
-# 1.4.1
+# 1.4.2
+
+- Seperate toggle for **Practice Run Complete!**
+
+## 1.4.1
 
 - Custom embed accent colors
 - New logo
