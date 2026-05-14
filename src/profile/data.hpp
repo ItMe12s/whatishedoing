@@ -16,7 +16,7 @@ struct TrackedKey {
 
 constexpr std::size_t kSlotCount = 10;
 
-std::array<TrackedKey, 42> const& trackedKeys();
+std::array<TrackedKey, 43> const& trackedKeys();
 
 std::array<std::string, kSlotCount> slotNames();
 std::string slotNameAt(std::size_t idx);

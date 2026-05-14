@@ -16,7 +16,7 @@ constexpr char const* kProfileNamesKey = "profile-names";
 constexpr char const* kActiveCustomTextSlotKey = "active-custom-text-slot";
 constexpr std::size_t kMaxNameLength = 32;
 
-std::array<TrackedKey, 42> const kTracked{{
+std::array<TrackedKey, 43> const kTracked{{
     {"webhook-url", Kind::String},
     {"extra-webhook-url-1", Kind::String},
     {"extra-webhook-url-2", Kind::String},
@@ -29,6 +29,7 @@ std::array<TrackedKey, 42> const kTracked{{
     {"notify-game-session", Kind::Bool},
     {"notify-play-level", Kind::Bool},
     {"notify-level-complete", Kind::Bool},
+    {"notify-practice-complete", Kind::Bool},
     {"notify-new-best", Kind::Bool},
     {"notify-editor", Kind::Bool},
     {"notify-death", Kind::Bool},
@@ -173,7 +174,7 @@ void applyBlobToSettings(matjson::Value const& blob) {
 
 } // namespace
 
-std::array<TrackedKey, 42> const& trackedKeys() {
+std::array<TrackedKey, 43> const& trackedKeys() {
     return kTracked;
 }
 

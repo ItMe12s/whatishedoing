@@ -101,6 +101,12 @@
 			"description": "Log when a run completes and include time on that run.",
 			"default": true
 		},
+		"notify-practice-complete": {
+			"type": "bool",
+			"name": "Notify on Practice Complete",
+			"description": "Log when a practice run completes. Same info as level complete.",
+			"default": true
+		},
 		"notify-new-best": {
 			"type": "bool",
 			"name": "Notify on New Best",

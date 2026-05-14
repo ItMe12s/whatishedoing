@@ -780,7 +780,9 @@ class $modify(MyPlayLayer, PlayLayer) {
                 auto fireWebhook =
                     [=](std::optional<std::vector<std::uint8_t>> shot) {
                         sendWebhook(
-                            "notify-level-complete",
+                            pre.practice
+                                ? "notify-practice-complete"
+                                : "notify-level-complete",
                             completeTitleSnapshot,
                             fmt::format(
                                 "{} beat **{}** by **{}**!",
