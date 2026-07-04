@@ -6,6 +6,7 @@
 #include <Geode/modify/PlayLayer.hpp>
 #include <Geode/utils/general.hpp>
 #include <Geode/utils/string.hpp>
+#include <algorithm>
 #include <cmath>
 #include <deque>
 #include <cvolton.level-id-api/include/EditorIDs.hpp>
@@ -77,7 +78,6 @@ void queueStartposSegmentStart(PlayLayer* layer) {
             }
             auto& s = levelSession();
             s.startPercent = startPercent;
-            s.bestNotifiedPercent = s.startPercent;
         }
     );
 }
@@ -103,7 +103,8 @@ void reopenLevelSessionIfNeeded(PlayLayer* layer) {
     session.active = true;
     session.startPercent =
         static_cast<int>(level->m_normalPercent.value());
-    session.bestNotifiedPercent = session.startPercent;
+    session.bestNotifiedPercent =
+        static_cast<int>(level->m_newNormalPercent2.value());
     syncPlayMode(layer);
     if (layer->m_isTestMode) {
         queueStartposSegmentStart(layer);
@@ -248,18 +249,23 @@ void sendDeathWebhookIfNeeded(
     );
 }
 
-void sendNewBestWebhookIfNeeded(PlayLayer* playLayer) {
+void sendNewBestWebhookIfNeeded(
+    PlayLayer* playLayer,
+    int pctAtDeath = -1,
+    int bestBeforeDeath = -1
+) {
     if (!Mod::get()->getSettingValue<bool>("notify-new-best")) {
         return;
     }
     if (!playLayer || !playLayer->m_level) {
         return;
     }
-    if (playLayer->m_isTestMode && !playLayer->m_isPracticeMode) {
-        return;
-    }
     auto* level = playLayer->m_level;
     auto& session = levelSession();
+    if (playLayer->m_isTestMode && !playLayer->m_isPracticeMode
+        && session.startPercent > 0) {
+        return;
+    }
     if (!session.active) {
         return;
     }
@@ -269,21 +275,25 @@ void sendNewBestWebhookIfNeeded(PlayLayer* playLayer) {
     if (session.practice) {
         return;
     }
-    auto const currentBest =
+    int const storedBest =
         static_cast<int>(level->m_newNormalPercent2.value());
-    if (currentBest <= session.bestNotifiedPercent) {
+    int effectiveBest = storedBest;
+    if (bestBeforeDeath >= 0 && pctAtDeath > bestBeforeDeath) {
+        effectiveBest = std::max(storedBest, pctAtDeath);
+    }
+    if (effectiveBest <= session.bestNotifiedPercent) {
         return;
     }
-    if (currentBest <= session.startPercent) {
+    if (effectiveBest <= session.startPercent) {
         return;
     }
-    if (currentBest >= 100) {
+    if (effectiveBest >= 100) {
         return;
     }
     auto const minPct = static_cast<int>(
         Mod::get()->getSettingValue<int64_t>("new-best-min-percent")
     );
-    if (currentBest < minPct) {
+    if (effectiveBest < minPct) {
         return;
     }
     auto const playerName = getPlayerName();
@@ -296,7 +306,7 @@ void sendNewBestWebhookIfNeeded(PlayLayer* playLayer) {
         Mod::get()->getSettingValue<bool>("suppress-redacted")) {
         return;
     }
-    session.bestNotifiedPercent = currentBest;
+    session.bestNotifiedPercent = effectiveBest;
     auto sendNewBest =
         [=](std::optional<std::vector<std::uint8_t>> shot) {
             sendWebhookDirect(
@@ -304,7 +314,7 @@ void sendNewBestWebhookIfNeeded(PlayLayer* playLayer) {
                 fmt::format(
                     "{} reached a new best of **{}%** on **{}** by **{}**.",
                     playerName,
-                    currentBest,
+                    effectiveBest,
                     display.levelName,
                     display.creatorName
                 ),
@@ -312,7 +322,7 @@ void sendNewBestWebhookIfNeeded(PlayLayer* playLayer) {
                 {
                     {"Level", display.levelName, true},
                     {"Creator", display.creatorName, true},
-                    {"Best", fmt::format("{}%", currentBest), true},
+                    {"Best", fmt::format("{}%", effectiveBest), true},
                 },
                 "",
                 std::move(shot)
@@ -409,15 +419,20 @@ bool consumeSentCompletedLevelExit(PlayLayer* layer) {
     return true;
 }
 
-void markCurrentBestHandled(PlayLayer* playLayer) {
+void markCurrentBestHandled(
+    PlayLayer* playLayer,
+    int pctAtDeath = -1,
+    int bestBeforeDeath = -1
+) {
     if (!playLayer || !playLayer->m_level) {
-        return;
-    }
-    if (playLayer->m_isTestMode && !playLayer->m_isPracticeMode) {
         return;
     }
     auto* level = playLayer->m_level;
     auto& session = levelSession();
+    if (playLayer->m_isTestMode && !playLayer->m_isPracticeMode
+        && session.startPercent > 0) {
+        return;
+    }
     if (!session.active) {
         return;
     }
@@ -427,10 +442,14 @@ void markCurrentBestHandled(PlayLayer* playLayer) {
     if (session.practice) {
         return;
     }
-    int const currentBest =
+    int const storedBest =
         static_cast<int>(level->m_newNormalPercent2.value());
-    if (currentBest > session.bestNotifiedPercent) {
-        session.bestNotifiedPercent = currentBest;
+    int effectiveBest = storedBest;
+    if (bestBeforeDeath >= 0 && pctAtDeath > bestBeforeDeath) {
+        effectiveBest = std::max(storedBest, pctAtDeath);
+    }
+    if (effectiveBest > session.bestNotifiedPercent) {
+        session.bestNotifiedPercent = effectiveBest;
     }
 }
 } // namespace
@@ -573,12 +592,14 @@ class $modify(MyPlayLayer, PlayLayer) {
         if (m_isTestMode) {
             session.startPercent =
                 static_cast<int>(level->m_normalPercent.value());
-            session.bestNotifiedPercent = session.startPercent;
+            session.bestNotifiedPercent =
+                static_cast<int>(level->m_newNormalPercent2.value());
             queueStartposSegmentStart(this);
         } else {
             session.startPercent =
                 static_cast<int>(level->m_normalPercent.value());
-            session.bestNotifiedPercent = session.startPercent;
+            session.bestNotifiedPercent =
+                static_cast<int>(level->m_newNormalPercent2.value());
         }
         auto const playerName = getPlayerName();
         if (!isContinuation) {
@@ -871,15 +892,11 @@ class $modify(MyPlayLayer, PlayLayer) {
     void destroyPlayer(PlayerObject* player, GameObject* object) {
         bool const trackDeath =
             Mod::get()->getSettingValue<bool>("notify-death");
-        int pctBefore = 0;
-        int bestBefore = 0;
-        if (trackDeath) {
-            pctBefore =
-                static_cast<int>(this->getCurrentPercent());
-            bestBefore = m_level
-                ? static_cast<int>(m_level->m_newNormalPercent2.value())
-                : 0;
-        }
+        int const pctBefore =
+            static_cast<int>(this->getCurrentPercent());
+        int const bestBefore = m_level
+            ? static_cast<int>(m_level->m_newNormalPercent2.value())
+            : 0;
         PlayLayer::destroyPlayer(player, object);
         resetSpeedhackSamples();
         if (!m_fields->disabledCheat) {
@@ -892,10 +909,10 @@ class $modify(MyPlayLayer, PlayLayer) {
         }
         syncPlayMode(this);
         bool const progressLegal = isProgressLegal();
-        if (progressLegal) {
-            sendNewBestWebhookIfNeeded(this);
-        } else {
-            markCurrentBestHandled(this);
+        if (progressLegal && pctBefore > 0) {
+            sendNewBestWebhookIfNeeded(this, pctBefore, bestBefore);
+        } else if (pctBefore > 0) {
+            markCurrentBestHandled(this, pctBefore, bestBefore);
         }
         if (trackDeath && progressLegal) {
             sendDeathWebhookIfNeeded(this, pctBefore, bestBefore);

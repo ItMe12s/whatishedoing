@@ -1,4 +1,13 @@
-# 1.4.2
+# Changelog
+
+Currently no announcements for this mod.
+
+## 1.4.3
+
+- Fixed switching startpos to 0 triggers new best message
+- New logo
+
+## 1.4.2
 
 - Seperate toggle for **Practice Run Complete!**
 
