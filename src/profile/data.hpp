@@ -7,28 +7,19 @@
 
 namespace profile {
 
-enum class Kind { Bool, Int, Float, String, Color };
+    constexpr std::size_t kSlotCount = 10;
 
-struct TrackedKey {
-    char const* key;
-    Kind kind;
-};
+    std::array<std::string, kSlotCount> slotNames();
+    std::string slotNameAt(std::size_t idx);
 
-constexpr std::size_t kSlotCount = 10;
+    bool slotIsFilled(std::string const& slot);
+    void snapshotIntoSlot(std::string const& slot);
+    void clearSlot(std::string const& slot);
+    geode::Result<> renameSlot(std::size_t idx, std::string newName);
 
-std::array<TrackedKey, 44> const& trackedKeys();
+    bool applyProfileNow(std::string const& slot);
 
-std::array<std::string, kSlotCount> slotNames();
-std::string slotNameAt(std::size_t idx);
-
-bool slotIsFilled(std::string const& slot);
-void snapshotIntoSlot(std::string const& slot);
-void clearSlot(std::string const& slot);
-geode::Result<> renameSlot(std::size_t idx, std::string newName);
-
-bool applyProfileNow(std::string const& slot);
-
-std::size_t activeCustomTextSlotIndex();
-void setActiveCustomTextSlotIndex(std::size_t idx);
+    std::size_t activeCustomTextSlotIndex();
+    void setActiveCustomTextSlotIndex(std::size_t idx);
 
 } // namespace profile

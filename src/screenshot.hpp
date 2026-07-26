@@ -3,7 +3,6 @@
 #include <cstdint>
 #include <functional>
 #include <optional>
-#include <string>
 #include <vector>
 
 class PlayLayer;
@@ -14,12 +13,14 @@ struct CapturedScreenshotRgba {
     int height = 0;
 };
 
-std::optional<CapturedScreenshotRgba> capturePlayLayerScreenshotRgba(
-    PlayLayer* playLayer
-);
+std::optional<CapturedScreenshotRgba> capturePlayLayerScreenshotRgba(PlayLayer* playLayer);
 
 void spawnScreenshotEncodeToPngThen(
-    CapturedScreenshotRgba captured,
-    int scalePercentClamped,
+    CapturedScreenshotRgba captured, int scalePercentClamped,
+    std::function<void(std::optional<std::vector<std::uint8_t>> png)> onMainThread
+);
+
+void capturePlayLayerScreenshotAfterDelay(
+    PlayLayer* playLayer, std::function<bool()> isStillValid,
     std::function<void(std::optional<std::vector<std::uint8_t>> png)> onMainThread
 );

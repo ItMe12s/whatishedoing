@@ -9,296 +9,287 @@ using namespace geode::prelude;
 
 namespace profile {
 
-namespace {
+    namespace {
 
-constexpr char const* kProfileDataKey = "profile-data";
-constexpr char const* kProfileNamesKey = "profile-names";
-constexpr char const* kActiveCustomTextSlotKey = "active-custom-text-slot";
-constexpr std::size_t kMaxNameLength = 32;
+        constexpr char const* kProfileDataKey = "profile-data";
+        constexpr char const* kProfileNamesKey = "profile-names";
+        constexpr char const* kActiveCustomTextSlotKey = "active-custom-text-slot";
+        constexpr std::size_t kMaxNameLength = 32;
 
-std::array<TrackedKey, 44> const kTracked{{
-    {"webhook-url", Kind::String},
-    {"extra-webhook-url-1", Kind::String},
-    {"extra-webhook-url-2", Kind::String},
-    {"extra-webhook-url-3", Kind::String},
-    {"extra-webhook-url-4", Kind::String},
-    {"webhook-username", Kind::String},
-    {"player-name", Kind::String},
-    {"max-retries", Kind::Int},
-    {"blocking-webhook", Kind::Bool},
-    {"notify-game-session", Kind::Bool},
-    {"notify-play-level", Kind::Bool},
-    {"notify-level-complete", Kind::Bool},
-    {"notify-practice-complete", Kind::Bool},
-    {"notify-new-best", Kind::Bool},
-    {"notify-editor", Kind::Bool},
-    {"notify-death", Kind::Bool},
-    {"cheat-detect", Kind::Bool},
-    {"death-min-percent", Kind::Int},
-    {"startpos-death-min-progress", Kind::Int},
-    {"new-best-min-percent", Kind::Int},
-    {"level-filter-mode", Kind::String},
-    {"level-filter-ids", Kind::String},
-    {"suppress-redacted", Kind::Bool},
-    {"screenshot-level-complete", Kind::Bool},
-    {"screenshot-new-best", Kind::Bool},
-    {"screenshot-death", Kind::Bool},
-    {"screenshot-scale-percent", Kind::Int},
-    {"screenshot-delay", Kind::Float},
-    {"notify-level-upload", Kind::Bool},
-    {"upload-send-on-update", Kind::Bool},
-    {"upload-use-custom-text", Kind::Bool},
-    {"upload-role-ping", Kind::Bool},
-    {"upload-role-id", Kind::String},
-    {"color-game-open", Kind::Color},
-    {"color-game-close", Kind::Color},
-    {"color-test-webhook", Kind::Color},
-    {"color-editor-open", Kind::Color},
-    {"color-editor-exit", Kind::Color},
-    {"color-new-best", Kind::Color},
-    {"color-level-complete", Kind::Color},
-    {"color-level-exit", Kind::Color},
-    {"color-death", Kind::Color},
-    {"color-play-practice", Kind::Color},
-    {"color-play-normal", Kind::Color},
-}};
+        enum class Kind {
+            Bool,
+            Int,
+            Float,
+            String,
+            Color
+        };
 
-std::string defaultNameFor(std::size_t idx) {
-    return fmt::format("Profile {}", idx + 1);
-}
+        struct TrackedKey {
+            char const* key;
+            Kind kind;
+        };
 
-matjson::Value loadAll() {
-    auto v = Mod::get()->getSavedValue<matjson::Value>(kProfileDataKey);
-    if (!v.isObject()) return matjson::Value::object();
-    return v;
-}
+        constexpr auto kTracked = std::to_array<TrackedKey>({
+            {"webhook-url", Kind::String},
+            {"extra-webhook-url-1", Kind::String},
+            {"extra-webhook-url-2", Kind::String},
+            {"extra-webhook-url-3", Kind::String},
+            {"extra-webhook-url-4", Kind::String},
+            {"webhook-username", Kind::String},
+            {"player-name", Kind::String},
+            {"max-retries", Kind::Int},
+            {"blocking-webhook", Kind::Bool},
+            {"notify-game-session", Kind::Bool},
+            {"notify-play-level", Kind::Bool},
+            {"notify-level-complete", Kind::Bool},
+            {"notify-practice-complete", Kind::Bool},
+            {"notify-new-best", Kind::Bool},
+            {"notify-editor", Kind::Bool},
+            {"notify-death", Kind::Bool},
+            {"cheat-detect", Kind::Bool},
+            {"death-min-percent", Kind::Int},
+            {"startpos-death-min-progress", Kind::Int},
+            {"new-best-min-percent", Kind::Int},
+            {"level-filter-mode", Kind::String},
+            {"level-filter-ids", Kind::String},
+            {"suppress-redacted", Kind::Bool},
+            {"screenshot-level-complete", Kind::Bool},
+            {"screenshot-new-best", Kind::Bool},
+            {"screenshot-death", Kind::Bool},
+            {"screenshot-scale-percent", Kind::Int},
+            {"screenshot-delay", Kind::Float},
+            {"notify-level-upload", Kind::Bool},
+            {"upload-send-on-update", Kind::Bool},
+            {"upload-use-custom-text", Kind::Bool},
+            {"upload-role-ping", Kind::Bool},
+            {"upload-role-id", Kind::String},
+            {"color-game-open", Kind::Color},
+            {"color-game-close", Kind::Color},
+            {"color-test-webhook", Kind::Color},
+            {"color-editor-open", Kind::Color},
+            {"color-editor-exit", Kind::Color},
+            {"color-new-best", Kind::Color},
+            {"color-level-complete", Kind::Color},
+            {"color-level-exit", Kind::Color},
+            {"color-death", Kind::Color},
+            {"color-play-practice", Kind::Color},
+            {"color-play-normal", Kind::Color},
+        });
 
-void storeAll(matjson::Value const& v) {
-    Mod::get()->setSavedValue<matjson::Value>(kProfileDataKey, v);
-}
+        std::string defaultNameFor(std::size_t idx) {
+            return fmt::format("Profile {}", idx + 1);
+        }
 
-matjson::Value loadNamesRaw() {
-    auto v = Mod::get()->getSavedValue<matjson::Value>(kProfileNamesKey);
-    if (!v.isArray()) return matjson::Value::array();
-    return v;
-}
+        matjson::Value loadAll() {
+            auto v = Mod::get()->getSavedValue<matjson::Value>(kProfileDataKey);
+            if (!v.isObject()) return matjson::Value::object();
+            return v;
+        }
 
-void storeNames(std::array<std::string, kSlotCount> const& names) {
-    auto arr = matjson::Value::array();
-    for (auto const& n : names) {
-        arr.push(n);
-    }
-    Mod::get()->setSavedValue<matjson::Value>(kProfileNamesKey, arr);
-}
+        void storeAll(matjson::Value const& v) {
+            Mod::get()->setSavedValue<matjson::Value>(kProfileDataKey, v);
+        }
 
-matjson::Value snapshotCurrentSettings() {
-    auto out = matjson::Value::object();
-    for (auto const& t : kTracked) {
-        switch (t.kind) {
-            case Kind::Bool:
-                out[t.key] = Mod::get()->getSettingValue<bool>(t.key);
-                break;
-            case Kind::Int:
-                out[t.key] = Mod::get()->getSettingValue<int64_t>(t.key);
-                break;
-            case Kind::Float:
-                out[t.key] = Mod::get()->getSettingValue<double>(t.key);
-                break;
-            case Kind::String:
-                out[t.key] =
-                    Mod::get()->getSettingValue<std::string>(t.key);
-                break;
-            case Kind::Color: {
-                auto c = Mod::get()
-                             ->getSettingValue<cocos2d::ccColor3B>(t.key);
-                auto obj = matjson::Value::object();
-                obj["r"] = static_cast<int64_t>(c.r);
-                obj["g"] = static_cast<int64_t>(c.g);
-                obj["b"] = static_cast<int64_t>(c.b);
-                out[t.key] = obj;
-                break;
+        matjson::Value loadNamesRaw() {
+            auto v = Mod::get()->getSavedValue<matjson::Value>(kProfileNamesKey);
+            if (!v.isArray()) return matjson::Value::array();
+            return v;
+        }
+
+        void storeNames(std::array<std::string, kSlotCount> const& names) {
+            auto arr = matjson::Value::array();
+            for (auto const& n : names) {
+                arr.push(n);
+            }
+            Mod::get()->setSavedValue<matjson::Value>(kProfileNamesKey, arr);
+        }
+
+        matjson::Value snapshotCurrentSettings() {
+            auto out = matjson::Value::object();
+            for (auto const& t : kTracked) {
+                switch (t.kind) {
+                    case Kind::Bool: out[t.key] = Mod::get()->getSettingValue<bool>(t.key); break;
+                    case Kind::Int: out[t.key] = Mod::get()->getSettingValue<int64_t>(t.key); break;
+                    case Kind::Float:
+                        out[t.key] = Mod::get()->getSettingValue<double>(t.key);
+                        break;
+                    case Kind::String:
+                        out[t.key] = Mod::get()->getSettingValue<std::string>(t.key);
+                        break;
+                    case Kind::Color: {
+                        auto c = Mod::get()->getSettingValue<cocos2d::ccColor3B>(t.key);
+                        auto obj = matjson::Value::object();
+                        obj["r"] = static_cast<int64_t>(c.r);
+                        obj["g"] = static_cast<int64_t>(c.g);
+                        obj["b"] = static_cast<int64_t>(c.b);
+                        out[t.key] = obj;
+                        break;
+                    }
+                }
+            }
+            return out;
+        }
+
+        void applyBlobToSettings(matjson::Value const& blob) {
+            if (!blob.isObject()) return;
+            for (auto const& t : kTracked) {
+                if (!blob.contains(t.key)) continue;
+                auto const& v = blob[t.key];
+                switch (t.kind) {
+                    case Kind::Bool: {
+                        auto r = v.asBool();
+                        if (r.isOk()) {
+                            Mod::get()->setSettingValue<bool>(t.key, r.unwrap());
+                        }
+                        break;
+                    }
+                    case Kind::Int: {
+                        auto r = v.asInt();
+                        if (r.isOk()) {
+                            Mod::get()->setSettingValue<int64_t>(
+                                t.key, static_cast<int64_t>(r.unwrap())
+                            );
+                        }
+                        break;
+                    }
+                    case Kind::Float: {
+                        auto r = v.asDouble();
+                        if (r.isOk()) {
+                            Mod::get()->setSettingValue<double>(t.key, r.unwrap());
+                        }
+                        break;
+                    }
+                    case Kind::String: {
+                        auto r = v.asString();
+                        if (r.isOk()) {
+                            Mod::get()->setSettingValue<std::string>(t.key, r.unwrap());
+                        }
+                        break;
+                    }
+                    case Kind::Color: {
+                        if (!v.isObject()) break;
+                        if (!v.contains("r") || !v.contains("g") || !v.contains("b")) break;
+                        auto rr = v["r"].asInt();
+                        auto gg = v["g"].asInt();
+                        auto bb = v["b"].asInt();
+                        if (!rr.isOk() || !gg.isOk() || !bb.isOk()) break;
+                        cocos2d::ccColor3B c{
+                            static_cast<GLubyte>(rr.unwrap()),
+                            static_cast<GLubyte>(gg.unwrap()),
+                            static_cast<GLubyte>(bb.unwrap()),
+                        };
+                        Mod::get()->setSettingValue<cocos2d::ccColor3B>(t.key, c);
+                        break;
+                    }
+                }
             }
         }
-    }
-    return out;
-}
 
-void applyBlobToSettings(matjson::Value const& blob) {
-    if (!blob.isObject()) return;
-    for (auto const& t : kTracked) {
-        if (!blob.contains(t.key)) continue;
-        auto const& v = blob[t.key];
-        switch (t.kind) {
-            case Kind::Bool: {
-                auto r = v.asBool();
-                if (r.isOk()) {
-                    Mod::get()->setSettingValue<bool>(t.key, r.unwrap());
-                }
-                break;
+    } // namespace
+
+    std::array<std::string, kSlotCount> slotNames() {
+        std::array<std::string, kSlotCount> out;
+        auto raw = loadNamesRaw();
+        for (std::size_t i = 0; i < kSlotCount; ++i) {
+            std::string name;
+            if (raw.isArray() && i < raw.size()) {
+                auto r = raw[i].asString();
+                if (r.isOk()) name = r.unwrap();
             }
-            case Kind::Int: {
-                auto r = v.asInt();
-                if (r.isOk()) {
-                    Mod::get()->setSettingValue<int64_t>(
-                        t.key,
-                        static_cast<int64_t>(r.unwrap())
-                    );
-                }
-                break;
-            }
-            case Kind::Float: {
-                auto r = v.asDouble();
-                if (r.isOk()) {
-                    Mod::get()->setSettingValue<double>(t.key, r.unwrap());
-                }
-                break;
-            }
-            case Kind::String: {
-                auto r = v.asString();
-                if (r.isOk()) {
-                    Mod::get()->setSettingValue<std::string>(
-                        t.key,
-                        r.unwrap()
-                    );
-                }
-                break;
-            }
-            case Kind::Color: {
-                if (!v.isObject()) break;
-                if (!v.contains("r") || !v.contains("g") || !v.contains("b"))
-                    break;
-                auto rr = v["r"].asInt();
-                auto gg = v["g"].asInt();
-                auto bb = v["b"].asInt();
-                if (!rr.isOk() || !gg.isOk() || !bb.isOk()) break;
-                cocos2d::ccColor3B c{
-                    static_cast<GLubyte>(rr.unwrap()),
-                    static_cast<GLubyte>(gg.unwrap()),
-                    static_cast<GLubyte>(bb.unwrap()),
-                };
-                Mod::get()->setSettingValue<cocos2d::ccColor3B>(t.key, c);
-                break;
-            }
+            if (name.empty()) name = defaultNameFor(i);
+            out[i] = std::move(name);
         }
-    }
-}
-
-} // namespace
-
-std::array<TrackedKey, 44> const& trackedKeys() {
-    return kTracked;
-}
-
-std::array<std::string, kSlotCount> slotNames() {
-    std::array<std::string, kSlotCount> out;
-    auto raw = loadNamesRaw();
-    for (std::size_t i = 0; i < kSlotCount; ++i) {
-        std::string name;
-        if (raw.isArray() && i < raw.size()) {
-            auto r = raw[i].asString();
-            if (r.isOk()) name = r.unwrap();
-        }
-        if (name.empty()) name = defaultNameFor(i);
-        out[i] = std::move(name);
-    }
-    return out;
-}
-
-std::string slotNameAt(std::size_t idx) {
-    if (idx >= kSlotCount) return {};
-    return slotNames()[idx];
-}
-
-bool slotIsFilled(std::string const& slot) {
-    auto all = loadAll();
-    return all.contains(slot) && all[slot].isObject();
-}
-
-void snapshotIntoSlot(std::string const& slot) {
-    auto all = loadAll();
-    all[slot] = snapshotCurrentSettings();
-    storeAll(all);
-}
-
-void clearSlot(std::string const& slot) {
-    auto all = loadAll();
-    if (!all.contains(slot)) return;
-    all.erase(slot);
-    storeAll(all);
-}
-
-Result<> renameSlot(std::size_t idx, std::string newName) {
-    if (idx >= kSlotCount) {
-        return Err("Invalid slot index");
-    }
-    auto trimmed = geode::utils::string::trim(std::move(newName));
-    if (trimmed.empty()) {
-        return Err("Name cannot be empty");
-    }
-    if (trimmed.size() > kMaxNameLength) {
-        return Err("Name too long (max {} chars)", kMaxNameLength);
-    }
-    auto names = slotNames();
-    auto const old = names[idx];
-    if (trimmed == old) {
-        return Ok();
-    }
-    for (std::size_t i = 0; i < kSlotCount; ++i) {
-        if (i == idx) continue;
-        if (names[i] == trimmed) {
-            return Err("Another slot is already named '{}'", trimmed);
-        }
+        return out;
     }
 
-    auto all = loadAll();
-    if (all.contains(old) && all[old].isObject()) {
-        all[trimmed] = all[old];
-        all.erase(old);
+    std::string slotNameAt(std::size_t idx) {
+        if (idx >= kSlotCount) return {};
+        return slotNames()[idx];
+    }
+
+    bool slotIsFilled(std::string const& slot) {
+        auto all = loadAll();
+        return all.contains(slot) && all[slot].isObject();
+    }
+
+    void snapshotIntoSlot(std::string const& slot) {
+        auto all = loadAll();
+        all[slot] = snapshotCurrentSettings();
         storeAll(all);
     }
 
-    names[idx] = trimmed;
-    storeNames(names);
-    return Ok();
-}
+    void clearSlot(std::string const& slot) {
+        auto all = loadAll();
+        if (!all.contains(slot)) return;
+        all.erase(slot);
+        storeAll(all);
+    }
 
-bool applyProfileNow(std::string const& slot) {
-    auto all = loadAll();
-    if (!all.contains(slot) || !all[slot].isObject()) {
-        log::warn("applyProfileNow: slot '{}' not found", slot);
-        return false;
-    }
-    applyBlobToSettings(all[slot]);
-    auto res = Mod::get()->saveData();
-    if (res.isErr()) {
-        log::warn(
-            "applyProfileNow: saveData failed: {}",
-            res.unwrapErr()
-        );
-        return false;
-    }
-    log::info("Applied profile '{}'", slot);
-    return true;
-}
+    Result<> renameSlot(std::size_t idx, std::string newName) {
+        if (idx >= kSlotCount) {
+            return Err("Invalid slot index");
+        }
+        auto trimmed = geode::utils::string::trim(std::move(newName));
+        if (trimmed.empty()) {
+            return Err("Name cannot be empty");
+        }
+        if (trimmed.size() > kMaxNameLength) {
+            return Err("Name too long (max {} chars)", kMaxNameLength);
+        }
+        auto names = slotNames();
+        auto const old = names[idx];
+        if (trimmed == old) {
+            return Ok();
+        }
+        for (std::size_t i = 0; i < kSlotCount; ++i) {
+            if (i == idx) continue;
+            if (names[i] == trimmed) {
+                return Err("Another slot is already named '{}'", trimmed);
+            }
+        }
 
-std::size_t activeCustomTextSlotIndex() {
-    int64_t const raw =
-        Mod::get()->getSavedValue<int64_t>(kActiveCustomTextSlotKey);
-    if (raw < 0 || static_cast<std::size_t>(raw) >= kSlotCount) {
-        return 0;
-    }
-    return static_cast<std::size_t>(raw);
-}
+        auto all = loadAll();
+        if (all.contains(old) && all[old].isObject()) {
+            all[trimmed] = all[old];
+            all.erase(old);
+            storeAll(all);
+        }
 
-void setActiveCustomTextSlotIndex(std::size_t idx) {
-    if (idx >= kSlotCount) {
-        idx = 0;
+        names[idx] = trimmed;
+        storeNames(names);
+        return Ok();
     }
-    Mod::get()->setSavedValue<int64_t>(
-        kActiveCustomTextSlotKey,
-        static_cast<int64_t>(idx)
-    );
-    (void)Mod::get()->saveData();
-}
+
+    bool applyProfileNow(std::string const& slot) {
+        auto all = loadAll();
+        if (!all.contains(slot) || !all[slot].isObject()) {
+            log::warn("applyProfileNow: slot '{}' not found", slot);
+            return false;
+        }
+        applyBlobToSettings(all[slot]);
+        auto res = Mod::get()->saveData();
+        if (res.isErr()) {
+            log::warn("applyProfileNow: saveData failed: {}", res.unwrapErr());
+            return false;
+        }
+        log::info("Applied profile '{}'", slot);
+        return true;
+    }
+
+    std::size_t activeCustomTextSlotIndex() {
+        int64_t const raw = Mod::get()->getSavedValue<int64_t>(kActiveCustomTextSlotKey);
+        if (raw < 0 || static_cast<std::size_t>(raw) >= kSlotCount) {
+            return 0;
+        }
+        return static_cast<std::size_t>(raw);
+    }
+
+    void setActiveCustomTextSlotIndex(std::size_t idx) {
+        if (idx >= kSlotCount) {
+            idx = 0;
+        }
+        Mod::get()->setSavedValue<int64_t>(kActiveCustomTextSlotKey, static_cast<int64_t>(idx));
+        (void)Mod::get()->saveData();
+    }
 
 } // namespace profile

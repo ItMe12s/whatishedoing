@@ -1,6 +1,7 @@
 #pragma once
 
-#include <Geode/Geode.hpp>
+#include "play_policy.hpp"
+
 #include <chrono>
 #include <cstdint>
 #include <string>
@@ -22,13 +23,12 @@ struct LevelSession {
     std::string levelName;
     std::string creatorName;
     bool active = false;
-    bool practice = false;
+    RunMode mode = RunMode::Normal;
     int startPercent = 0;
     int bestNotifiedPercent = 0;
     bool deathNotified = false;
 
     int64_t elapsedMilliseconds() const;
-    std::string settingKey() const;
     std::string startTitle() const;
     std::string exitTitle() const;
     std::string completeTitle() const;
@@ -58,14 +58,12 @@ int secondsSince(Clock::time_point const& start);
 struct LevelDisplay {
     std::string levelName;
     std::string creatorName;
-    bool        showLevelID;
-    bool        redacted;
+    bool showLevelID;
+    bool redacted;
 };
 
 LevelDisplay resolveLevelDisplay(
-    int levelID,
-    std::string const& rawLevelName,
-    std::string const& rawCreatorName
+    int levelID, std::string const& rawLevelName, std::string const& rawCreatorName
 );
 
 bool isIdInFilterList(int id);

@@ -1,20 +1,17 @@
-#include "embed_colors.hpp"
 #include "state.hpp"
 
-#include <Geode/utils/general.hpp>
-#include <Geode/utils/string.hpp>
-#include <algorithm>
-#include <cctype>
+#include "embed_colors.hpp"
+#include "level_filter.hpp"
+
+#include <Geode/Geode.hpp>
 #include <string>
-#include <unordered_set>
-#include <vector>
 
 using namespace geode::prelude;
 
 namespace {
-GameSession s_gameSession;
-LevelSession s_levelSession;
-EditorSession s_editorSession;
+    GameSession s_gameSession;
+    LevelSession s_levelSession;
+    EditorSession s_editorSession;
 } // namespace
 
 int64_t LevelSession::elapsedMilliseconds() const {
@@ -25,27 +22,31 @@ int64_t LevelSession::elapsedMilliseconds() const {
     return total.count();
 }
 
-std::string LevelSession::settingKey() const {
-    return "notify-play-level";
-}
-
 std::string LevelSession::startTitle() const {
-    if (practice) return "Playing a Level (Practice)";
+    if (mode == RunMode::Practice) {
+        return "Playing a Level (Practice)";
+    }
     return "Playing a Level";
 }
 
 std::string LevelSession::exitTitle() const {
-    if (practice) return "Exited a Practice Run";
+    if (mode == RunMode::Practice) {
+        return "Exited a Practice Run";
+    }
     return "Exited a Level";
 }
 
 std::string LevelSession::completeTitle() const {
-    if (practice) return "Practice Run Complete!";
+    if (mode == RunMode::Practice) {
+        return "Practice Run Complete!";
+    }
     return "Level Complete!";
 }
 
 int LevelSession::color() const {
-    if (practice) return embed_color::playPractice();
+    if (mode == RunMode::Practice) {
+        return embed_color::playPractice();
+    }
     return embed_color::playNormal();
 }
 
@@ -55,7 +56,7 @@ void LevelSession::reset() {
     levelName.clear();
     creatorName.clear();
     active = false;
-    practice = false;
+    mode = RunMode::Normal;
     startPercent = 0;
     bestNotifiedPercent = 0;
     deathNotified = false;
@@ -101,24 +102,8 @@ int secondsSince(Clock::time_point const& start) {
 
 namespace {
 
-constexpr char const* kRedactedLevelName = "Private level";
-constexpr char const* kRedactedCreatorName = "-";
-
-std::unordered_set<int> parseLevelIDs(std::string const& raw) {
-    std::unordered_set<int> out;
-    std::string normalized = raw;
-    for (auto& c : normalized) {
-        if (std::isspace(static_cast<unsigned char>(c))) c = ',';
-    }
-    for (auto const& tok : geode::utils::string::split(normalized, ",")) {
-        if (tok.empty()) continue;
-        auto res = geode::utils::numFromString<int>(tok);
-        if (res.isOk()) {
-            out.insert(res.unwrap());
-        }
-    }
-    return out;
-}
+    constexpr char const* kRedactedLevelName = "Private level";
+    constexpr char const* kRedactedCreatorName = "-";
 
 } // namespace
 
@@ -126,57 +111,40 @@ bool isIdInFilterList(int id) {
     if (id <= 0) {
         return false;
     }
-    auto const raw =
-        Mod::get()->getSettingValue<std::string>("level-filter-ids");
-    return parseLevelIDs(raw).contains(id);
+    auto const raw = Mod::get()->getSettingValue<std::string>("level-filter-ids");
+    return level_filter::parseLevelIds(raw).contains(id);
 }
 
 void setIdInFilterList(int id, bool inList) {
     if (id <= 0) {
         return;
     }
-    auto const raw =
-        Mod::get()->getSettingValue<std::string>("level-filter-ids");
-    auto ids = parseLevelIDs(raw);
+    auto const raw = Mod::get()->getSettingValue<std::string>("level-filter-ids");
+    auto ids = level_filter::parseLevelIds(raw);
     if (inList) {
         ids.insert(id);
-    } else {
+    }
+    else {
         ids.erase(id);
     }
-    std::vector<int> sorted(ids.begin(), ids.end());
-    std::sort(sorted.begin(), sorted.end());
-    std::vector<std::string> parts;
-    parts.reserve(sorted.size());
-    for (int const id : sorted) {
-        parts.push_back(geode::utils::numToString(id));
-    }
-    auto const out = geode::utils::string::join(parts, ",");
+    auto const out = level_filter::serializeLevelIds(ids);
     Mod::get()->setSettingValue<std::string>("level-filter-ids", out);
 }
 
 LevelDisplay resolveLevelDisplay(
-    int levelID,
-    std::string const& rawLevelName,
-    std::string const& rawCreatorName
+    int levelID, std::string const& rawLevelName, std::string const& rawCreatorName
 ) {
     LevelDisplay normal{
-        displayLevelName(rawLevelName),
-        displayCreatorName(rawCreatorName),
-        levelID > 0,
-        false
+        displayLevelName(rawLevelName), displayCreatorName(rawCreatorName), levelID > 0, false
     };
     auto const mode =
-        Mod::get()->getSettingValue<std::string>("level-filter-mode");
-    if (mode != "Blacklist" && mode != "Whitelist") {
+        level_filter::parseMode(Mod::get()->getSettingValue<std::string>("level-filter-mode"));
+    if (mode == level_filter::Mode::All) {
         return normal;
     }
-    auto const idsRaw =
-        Mod::get()->getSettingValue<std::string>("level-filter-ids");
-    auto const ids = parseLevelIDs(idsRaw);
-    bool const inList = levelID > 0 && ids.contains(levelID);
-    bool const redact =
-        (mode == "Blacklist" && inList) ||
-        (mode == "Whitelist" && !inList);
+    auto const idsRaw = Mod::get()->getSettingValue<std::string>("level-filter-ids");
+    auto const ids = level_filter::parseLevelIds(idsRaw);
+    bool const redact = level_filter::shouldRedact(levelID, mode, ids);
     if (!redact) {
         return normal;
     }

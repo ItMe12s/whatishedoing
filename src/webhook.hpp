@@ -1,6 +1,5 @@
 #pragma once
 
-#include <Geode/Geode.hpp>
 #include <cstdint>
 #include <optional>
 #include <string>
@@ -12,36 +11,18 @@ struct WebhookField {
     bool inlineField = true;
 };
 
-std::string formatDuration(int totalSeconds);
-std::string formatDurationMs(int64_t totalMs);
+struct WebhookMessage {
+    std::string title;
+    std::string description;
+    int color = 0;
+    std::vector<WebhookField> fields;
+    std::string footer;
+    std::optional<std::vector<std::uint8_t>> screenshotPng;
+};
 
-void sendWebhookDirect(
-    std::string const& title,
-    std::string const& description,
-    int color,
-    std::vector<WebhookField> const& fields = {},
-    std::string const& footer = "",
-    std::optional<std::vector<std::uint8_t>> screenshotPng = std::nullopt
-);
-
-void sendWebhookDirectSync(
-    std::string const& title,
-    std::string const& description,
-    int color,
-    std::vector<WebhookField> const& fields = {},
-    std::string const& footer = "",
-    std::optional<std::vector<std::uint8_t>> screenshotPng = std::nullopt
-);
-
-void sendWebhook(
-    std::string const& settingKey,
-    std::string const& title,
-    std::string const& description,
-    int color,
-    std::vector<WebhookField> const& fields = {},
-    std::string const& footer = "",
-    std::optional<std::vector<std::uint8_t>> screenshotPng = std::nullopt
-);
+void sendWebhook(WebhookMessage message);
+void sendWebhookIfEnabled(std::string const& settingKey, WebhookMessage message);
+void sendWebhookBlocking(WebhookMessage message);
 
 // Plain-message webhook (JSON content field only), all configured URLs and retries.
 void sendWebhookContent(std::string const& content);

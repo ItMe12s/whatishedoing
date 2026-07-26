@@ -1,573 +1,389 @@
 #include "webhook.hpp"
 
+#include "retry_policy.hpp"
+#include "text_policy.hpp"
+
+#include <Geode/Geode.hpp>
 #include <Geode/utils/async.hpp>
-#include <Geode/utils/general.hpp>
 #include <Geode/utils/string.hpp>
 #include <Geode/utils/web.hpp>
-#include <matjson.hpp>
 #include <algorithm>
+#include <arc/time/Sleep.hpp>
 #include <chrono>
-#include <ctime>
 #include <cstdint>
+#include <ctime>
+#include <matjson.hpp>
 #include <memory>
 #include <optional>
 #include <string_view>
 #include <thread>
+#include <utility>
 #include <vector>
 
 using namespace geode::prelude;
 
 namespace webhook_impl {
 
-constexpr auto kAsyncRequestTimeout = std::chrono::seconds(10);
-constexpr auto kSyncRequestTimeout = std::chrono::seconds(3);
-constexpr int kSyncMaxRetries = 1;
-constexpr int kSyncMaxRetryDelaySeconds = 2;
+    constexpr auto kAsyncRequestTimeout = std::chrono::seconds(10);
+    constexpr auto kSyncRequestTimeout = std::chrono::seconds(3);
+    constexpr int kSyncMaxRetries = 1;
+    constexpr int kSyncMaxRetryDelaySeconds = 2;
 
-constexpr size_t kDiscordEmbedTitleMax = 256;
-constexpr size_t kDiscordEmbedDescriptionMax = 4096;
-constexpr size_t kDiscordEmbedFieldNameMax = 256;
-constexpr size_t kDiscordEmbedFieldValueMax = 1024;
-constexpr size_t kDiscordEmbedFooterMax = 2048;
-constexpr size_t kDiscordWebhookUsernameMax = 80;
-constexpr size_t kDiscordEmbedFieldCountMax = 25;
+    constexpr size_t kDiscordEmbedTitleMax = 256;
+    constexpr size_t kDiscordEmbedDescriptionMax = 4096;
+    constexpr size_t kDiscordEmbedFieldNameMax = 256;
+    constexpr size_t kDiscordEmbedFieldValueMax = 1024;
+    constexpr size_t kDiscordEmbedFooterMax = 2048;
+    constexpr size_t kDiscordWebhookUsernameMax = 80;
+    constexpr size_t kDiscordEmbedFieldCountMax = 25;
 
-static std::string clampUtf8ByBytes(
-    std::string s,
-    size_t maxBytes,
-    char const* ctx
-) {
-    if (s.size() <= maxBytes) {
-        return s;
-    }
-    log::warn("{} truncated from {} to {} bytes", ctx, s.size(), maxBytes);
-    s.resize(maxBytes);
-    while (!s.empty() &&
-           (static_cast<unsigned char>(s.back()) & 0xc0) == 0x80) {
-        s.pop_back();
-    }
-    return s;
-}
-
-static bool isAllowedDiscordWebhookHost(std::string const& hostLower) {
-    return hostLower == "discord.com" || hostLower == "discordapp.com" ||
-        hostLower == "canary.discord.com" || hostLower == "ptb.discord.com";
-}
-
-static bool pathHasDiscordWebhookPrefix(std::string const& url) {
-    return url.find("/api/webhooks/") != std::string::npos;
-}
-
-// Returns nullopt if the URL is missing or not suitable for a Discord
-// webhook POST.
-std::optional<std::string> normalizeWebhookUrl(std::string const& raw) {
-    std::string url = raw;
-    geode::utils::string::trimIP(url);
-    if (url.empty()) return std::nullopt;
-    if (url.rfind("https://", 0) != 0) {
-        log::warn("Webhook URL must start with https://");
-        return std::nullopt;
-    }
-    if (!pathHasDiscordWebhookPrefix(url)) {
-        log::warn(
-            "Webhook URL must include Discord path /api/webhooks/"
-        );
-        return std::nullopt;
-    }
-    size_t const hostStart = 8;
-    size_t pathStart = url.find('/', hostStart);
-    if (pathStart == std::string::npos) {
-        log::warn("Webhook URL missing path after host");
-        return std::nullopt;
-    }
-    std::string host = url.substr(hostStart, pathStart - hostStart);
-    if (auto const at = host.rfind('@'); at != std::string::npos) {
-        host = host.substr(at + 1);
-    }
-    if (auto const colon = host.find(':'); colon != std::string::npos) {
-        if (host.empty() || host.front() != '[') {
-            host = host.substr(0, colon);
+    static std::string clampUtf8ByBytes(std::string s, size_t maxBytes, char const* ctx) {
+        if (s.size() <= maxBytes) {
+            return s;
         }
+        log::warn("{} truncated from {} to {} bytes", ctx, s.size(), maxBytes);
+        return text_policy::clampUtf8ByBytes(s, maxBytes);
     }
-    host = geode::utils::string::toLower(std::move(host));
-    if (!isAllowedDiscordWebhookHost(host)) {
-        log::warn(
-            "Webhook URL host must be discord.com, discordapp.com, "
-            "canary.discord.com, or ptb.discord.com"
-        );
-        return std::nullopt;
-    }
-    return url;
-}
 
-std::vector<std::string> collectWebhookTargets() {
-    static constexpr char const* kExtraKeys[] = {
-        "extra-webhook-url-1",
-        "extra-webhook-url-2",
-        "extra-webhook-url-3",
-        "extra-webhook-url-4",
-    };
-    std::vector<std::string> out;
-    if (auto u = normalizeWebhookUrl(
-            Mod::get()->getSettingValue<std::string>("webhook-url"))) {
-        out.push_back(std::move(*u));
+    static bool isAllowedDiscordWebhookHost(std::string const& hostLower) {
+        return hostLower == "discord.com" || hostLower == "discordapp.com" ||
+            hostLower == "canary.discord.com" || hostLower == "ptb.discord.com";
     }
-    for (auto* key : kExtraKeys) {
-        if (auto u = normalizeWebhookUrl(
-                Mod::get()->getSettingValue<std::string>(key))) {
+
+    static bool pathHasDiscordWebhookPrefix(std::string const& url) {
+        return geode::utils::string::contains(url, "/api/webhooks/");
+    }
+
+    // Returns nullopt if the URL is missing or not suitable for a Discord webhook POST.
+    std::optional<std::string> normalizeWebhookUrl(std::string const& raw) {
+        std::string url = raw;
+        geode::utils::string::trimIP(url);
+        if (url.empty()) return std::nullopt;
+        if (!geode::utils::string::startsWith(url, "https://")) {
+            log::warn("Webhook URL must start with https://");
+            return std::nullopt;
+        }
+        if (!pathHasDiscordWebhookPrefix(url)) {
+            log::warn("Webhook URL must include Discord path /api/webhooks/");
+            return std::nullopt;
+        }
+        size_t const hostStart = 8;
+        size_t pathStart = url.find('/', hostStart);
+        if (pathStart == std::string::npos) {
+            log::warn("Webhook URL missing path after host");
+            return std::nullopt;
+        }
+        std::string host = url.substr(hostStart, pathStart - hostStart);
+        if (auto const at = host.rfind('@'); at != std::string::npos) {
+            host = host.substr(at + 1);
+        }
+        if (auto const colon = host.find(':'); colon != std::string::npos) {
+            if (host.empty() || host.front() != '[') {
+                host = host.substr(0, colon);
+            }
+        }
+        host = geode::utils::string::toLower(std::move(host));
+        if (!isAllowedDiscordWebhookHost(host)) {
+            log::warn(
+                "Webhook URL host must be discord.com, discordapp.com, "
+                "canary.discord.com, or ptb.discord.com"
+            );
+            return std::nullopt;
+        }
+        return url;
+    }
+
+    std::vector<std::string> collectWebhookTargets() {
+        static constexpr char const* kExtraKeys[] = {
+            "extra-webhook-url-1",
+            "extra-webhook-url-2",
+            "extra-webhook-url-3",
+            "extra-webhook-url-4",
+        };
+        std::vector<std::string> out;
+        if (auto u = normalizeWebhookUrl(Mod::get()->getSettingValue<std::string>("webhook-url"))) {
             out.push_back(std::move(*u));
         }
+        for (auto* key : kExtraKeys) {
+            if (auto u = normalizeWebhookUrl(Mod::get()->getSettingValue<std::string>(key))) {
+                out.push_back(std::move(*u));
+            }
+        }
+        return out;
     }
-    return out;
-}
 
-std::string currentIso8601Utc() {
-    auto const now = std::chrono::system_clock::now();
-    auto const tt = std::chrono::system_clock::to_time_t(now);
-    std::tm utc{};
+    std::string currentIso8601Utc() {
+        auto const now = std::chrono::system_clock::now();
+        auto const tt = std::chrono::system_clock::to_time_t(now);
+        std::tm utc{};
 #ifdef _WIN32
-    gmtime_s(&utc, &tt);
+        gmtime_s(&utc, &tt);
 #else
-    gmtime_r(&tt, &utc);
+        gmtime_r(&tt, &utc);
 #endif
-    char buf[32];
-    std::strftime(
-        buf,
-        sizeof(buf),
-        "%Y-%m-%dT%H:%M:%SZ",
-        &utc
-    );
-    return buf;
-}
-
-matjson::Value buildWebhookPayload(
-    std::string const& title,
-    std::string const& description,
-    int color,
-    std::vector<WebhookField> const& fields,
-    std::string const& footer,
-    bool embedScreenshotAttachment
-) {
-    auto const titleClamped = clampUtf8ByBytes(
-        title,
-        kDiscordEmbedTitleMax,
-        "webhook embed title"
-    );
-    auto const descClamped = clampUtf8ByBytes(
-        description,
-        kDiscordEmbedDescriptionMax,
-        "webhook embed description"
-    );
-    auto const footerClamped = clampUtf8ByBytes(
-        footer,
-        kDiscordEmbedFooterMax,
-        "webhook embed footer"
-    );
-
-    auto fieldsArr = matjson::Value::array();
-    size_t const nFields =
-        std::min(fields.size(), kDiscordEmbedFieldCountMax);
-    if (fields.size() > kDiscordEmbedFieldCountMax) {
-        log::warn(
-            "Webhook embed fields truncated from {} to {}",
-            fields.size(),
-            kDiscordEmbedFieldCountMax
-        );
-    }
-    for (size_t i = 0; i < nFields; ++i) {
-        auto const& f = fields[i];
-        auto obj = matjson::Value::object();
-        obj["name"] = clampUtf8ByBytes(
-            f.name,
-            kDiscordEmbedFieldNameMax,
-            "webhook embed field name"
-        );
-        obj["value"] = clampUtf8ByBytes(
-            f.value,
-            kDiscordEmbedFieldValueMax,
-            "webhook embed field value"
-        );
-        obj["inline"] = f.inlineField;
-        fieldsArr.push(obj);
+        char buf[32];
+        std::strftime(buf, sizeof(buf), "%Y-%m-%dT%H:%M:%SZ", &utc);
+        return buf;
     }
 
-    auto embed = matjson::Value::object();
-    embed["title"] = titleClamped;
-    embed["description"] = descClamped;
-    embed["color"] = color;
-    embed["fields"] = fieldsArr;
-    embed["timestamp"] = currentIso8601Utc();
-    if (!footerClamped.empty()) {
-        auto footerObj = matjson::Value::object();
-        footerObj["text"] = footerClamped;
-        embed["footer"] = footerObj;
-    }
-    if (embedScreenshotAttachment) {
-        auto imgObj = matjson::Value::object();
-        imgObj["url"] = "attachment://screenshot.png";
-        embed["image"] = imgObj;
-    }
+    matjson::Value buildWebhookPayload(
+        std::string const& title, std::string const& description, int color,
+        std::vector<WebhookField> const& fields, std::string const& footer,
+        bool embedScreenshotAttachment
+    ) {
+        auto const titleClamped =
+            clampUtf8ByBytes(title, kDiscordEmbedTitleMax, "webhook embed title");
+        auto const descClamped =
+            clampUtf8ByBytes(description, kDiscordEmbedDescriptionMax, "webhook embed description");
+        auto const footerClamped =
+            clampUtf8ByBytes(footer, kDiscordEmbedFooterMax, "webhook embed footer");
 
-    auto embedsArr = matjson::Value::array();
-    embedsArr.push(embed);
-
-    auto payload = matjson::Value::object();
-    auto username = geode::utils::string::trim(
-        Mod::get()->getSettingValue<std::string>("webhook-username"));
-    if (!username.empty()) {
-        payload["username"] = clampUtf8ByBytes(
-            std::move(username),
-            kDiscordWebhookUsernameMax,
-            "webhook username override"
-        );
-    }
-    payload["embeds"] = embedsArr;
-    return payload;
-}
-
-std::optional<int> backoffSecondsForFailedAttempt(
-    web::WebResponse const& res,
-    int attempt,
-    int maxRetries,
-    std::optional<int> maxDelaySeconds = std::nullopt
-) {
-    if (attempt >= maxRetries) {
-        log::warn(
-            "Webhook POST failed after {} attempts (status {})",
-            attempt + 1,
-            res.code()
-        );
-        return std::nullopt;
-    }
-    if (res.code() == 429) {
-        auto const ra = res.header("Retry-After");
-        if (ra && !ra->empty()) {
-            auto const n = geode::utils::numFromString<int>(
-                std::string_view{*ra},
-                10
+        auto fieldsArr = matjson::Value::array();
+        size_t const nFields = std::min(fields.size(), kDiscordEmbedFieldCountMax);
+        if (fields.size() > kDiscordEmbedFieldCountMax) {
+            log::warn(
+                "Webhook embed fields truncated from {} to {}", fields.size(), kDiscordEmbedFieldCountMax
             );
-            return n.mapOr(2, [maxDelaySeconds](int v) {
-                int const maxDelay = maxDelaySeconds.value_or(86'400);
-                return std::clamp(v, 1, maxDelay);
-            });
         }
-        return maxDelaySeconds
-            ? std::min(2, *maxDelaySeconds)
-            : 2;
-    }
-    int const wait = 1 << attempt;
-    int const clampedWait = maxDelaySeconds
-        ? std::min(wait, *maxDelaySeconds)
-        : wait;
-    log::warn(
-        "Webhook POST failed (status {}), retrying in {}s ({}/{})",
-        res.code(),
-        clampedWait,
-        attempt + 1,
-        maxRetries + 1
-    );
-    return clampedWait;
-}
+        for (size_t i = 0; i < nFields; ++i) {
+            auto const& f = fields[i];
+            auto obj = matjson::Value::object();
+            obj["name"] =
+                clampUtf8ByBytes(f.name, kDiscordEmbedFieldNameMax, "webhook embed field name");
+            obj["value"] =
+                clampUtf8ByBytes(f.value, kDiscordEmbedFieldValueMax, "webhook embed field value");
+            obj["inline"] = f.inlineField;
+            fieldsArr.push(obj);
+        }
 
-void postWebhookSyncWithRetries(
-    std::string const& url,
-    matjson::Value const& payload,
-    int attempt,
-    int maxRetries
-) {
-    auto req = web::WebRequest();
-    req.header("Content-Type", "application/json");
-    req.bodyJSON(payload);
-    req.timeout(kSyncRequestTimeout);
+        auto embed = matjson::Value::object();
+        embed["title"] = titleClamped;
+        embed["description"] = descClamped;
+        embed["color"] = color;
+        embed["fields"] = fieldsArr;
+        embed["timestamp"] = currentIso8601Utc();
+        if (!footerClamped.empty()) {
+            auto footerObj = matjson::Value::object();
+            footerObj["text"] = footerClamped;
+            embed["footer"] = footerObj;
+        }
+        if (embedScreenshotAttachment) {
+            auto imgObj = matjson::Value::object();
+            imgObj["url"] = "attachment://screenshot.png";
+            embed["image"] = imgObj;
+        }
 
-    auto res = req.postSync(url);
-    if (res.ok()) return;
+        auto embedsArr = matjson::Value::array();
+        embedsArr.push(embed);
 
-    auto wait = backoffSecondsForFailedAttempt(
-        res,
-        attempt,
-        maxRetries,
-        kSyncMaxRetryDelaySeconds
-    );
-    if (!wait) return;
-
-    std::this_thread::sleep_for(
-        std::chrono::seconds(*wait)
-    );
-    postWebhookSyncWithRetries(
-        url,
-        payload,
-        attempt + 1,
-        maxRetries
-    );
-}
-
-void postWebhookWithRetries(
-    std::string const& url,
-    matjson::Value payload,
-    int attempt,
-    int maxRetries
-) {
-    auto req = web::WebRequest();
-    req.header("Content-Type", "application/json");
-    req.bodyJSON(payload);
-    req.timeout(kAsyncRequestTimeout);
-
-    async::spawn(
-        req.post(url),
-        [url, payload = std::move(payload), attempt, maxRetries](
-            web::WebResponse res) mutable {
-            if (res.ok()) return;
-            auto wait = backoffSecondsForFailedAttempt(
-                res,
-                attempt,
-                maxRetries
+        auto payload = matjson::Value::object();
+        auto username =
+            geode::utils::string::trim(Mod::get()->getSettingValue<std::string>("webhook-username"));
+        if (!username.empty()) {
+            payload["username"] = clampUtf8ByBytes(
+                std::move(username), kDiscordWebhookUsernameMax, "webhook username override"
             );
-            if (!wait) return;
-            int const delaySec = *wait;
-            async::runtime().spawnBlocking<void>(
-                [url, payload = std::move(payload), delaySec, attempt, maxRetries]() mutable {
-                    std::this_thread::sleep_for(std::chrono::seconds(delaySec));
-                    geode::queueInMainThread(
-                        [url = std::move(url),
-                         payload = std::move(payload),
-                         attempt,
-                         maxRetries]() mutable {
-                            postWebhookWithRetries(
-                                url,
-                                std::move(payload),
-                                attempt + 1,
-                                maxRetries
-                            );
-                        }
-                    );
+        }
+        payload["embeds"] = embedsArr;
+        return payload;
+    }
+
+    std::optional<int> backoffSecondsForFailedAttempt(
+        web::WebResponse const& res, int attempt, int maxRetries,
+        std::optional<int> maxDelaySeconds = std::nullopt
+    ) {
+        auto const retryAfter = res.header("Retry-After");
+        auto const delay = retry_policy::delayForFailure(
+            res.code(),
+            retryAfter ? std::optional<std::string_view>{*retryAfter} : std::nullopt,
+            attempt,
+            maxRetries,
+            maxDelaySeconds
+        );
+        if (!delay) {
+            log::warn("Webhook POST failed after {} attempts (status {})", attempt + 1, res.code());
+            return std::nullopt;
+        }
+        if (res.code() != 429) {
+            log::warn(
+                "Webhook POST failed (status {}), retrying in {}s ({}/{})",
+                res.code(),
+                *delay,
+                attempt + 1,
+                maxRetries + 1
+            );
+        }
+        return delay;
+    }
+
+    void postWebhookSyncWithRetries(std::string const& url, matjson::Value const& payload, int maxRetries) {
+        for (int attempt = 0;; ++attempt) {
+            auto req = web::WebRequest();
+            req.bodyJSON(payload);
+            req.timeout(kSyncRequestTimeout);
+
+            auto res = req.postSync(url);
+            if (res.ok()) {
+                return;
+            }
+            auto wait =
+                backoffSecondsForFailedAttempt(res, attempt, maxRetries, kSyncMaxRetryDelaySeconds);
+            if (!wait) {
+                return;
+            }
+            std::this_thread::sleep_for(std::chrono::seconds(*wait));
+        }
+    }
+
+    arc::Future<> postWebhookWithRetries(std::string url, matjson::Value payload, int maxRetries) {
+        for (int attempt = 0;; ++attempt) {
+            auto req = web::WebRequest();
+            req.bodyJSON(payload);
+            req.timeout(kAsyncRequestTimeout);
+
+            auto res = co_await req.post(url);
+            if (res.ok()) {
+                co_return;
+            }
+            auto wait = backoffSecondsForFailedAttempt(res, attempt, maxRetries);
+            if (!wait) {
+                co_return;
+            }
+            co_await arc::sleep(asp::Duration::fromSecs(*wait));
+        }
+    }
+
+    arc::Future<> postWebhookMultipartWithRetries(
+        std::string url, std::string payloadJson,
+        std::shared_ptr<std::vector<std::uint8_t> const> pngBytes, int maxRetries
+    ) {
+        if (!pngBytes) {
+            co_return;
+        }
+        for (int attempt = 0;; ++attempt) {
+            web::MultipartForm form;
+            form.param("payload_json", payloadJson);
+            form.file("files[0]", *pngBytes, "screenshot.png", "image/png");
+            auto req = web::WebRequest();
+            req.bodyMultipart(std::move(form));
+            req.timeout(kAsyncRequestTimeout);
+
+            auto res = co_await req.post(url);
+            if (res.ok()) {
+                co_return;
+            }
+            auto wait = backoffSecondsForFailedAttempt(res, attempt, maxRetries);
+            if (!wait) {
+                co_return;
+            }
+            co_await arc::sleep(asp::Duration::fromSecs(*wait));
+        }
+    }
+
+    void postWebhookSyncMultipartWithRetries(
+        std::string const& url, std::string const& payloadJson,
+        std::vector<std::uint8_t> const& pngBytes, int maxRetries
+    ) {
+        for (int attempt = 0;; ++attempt) {
+            web::MultipartForm form;
+            form.param("payload_json", payloadJson);
+            form.file("files[0]", pngBytes, "screenshot.png", "image/png");
+            auto req = web::WebRequest();
+            req.bodyMultipart(std::move(form));
+            req.timeout(kSyncRequestTimeout);
+
+            auto res = req.postSync(url);
+            if (res.ok()) {
+                return;
+            }
+            auto wait =
+                backoffSecondsForFailedAttempt(res, attempt, maxRetries, kSyncMaxRetryDelaySeconds);
+            if (!wait) {
+                return;
+            }
+            std::this_thread::sleep_for(std::chrono::seconds(*wait));
+        }
+    }
+
+    void sendImpl(bool useSync, WebhookMessage message) {
+        auto urls = collectWebhookTargets();
+        if (urls.empty()) {
+            return;
+        }
+        auto maxRetries = static_cast<int>(Mod::get()->getSettingValue<int64_t>("max-retries"));
+        if (maxRetries < 0) {
+            maxRetries = 0;
+        }
+        int const effectiveMaxRetries = useSync ? std::min(maxRetries, kSyncMaxRetries) : maxRetries;
+
+        bool const hasShot = message.screenshotPng.has_value() && !message.screenshotPng->empty();
+
+        if (hasShot) {
+            auto payload = buildWebhookPayload(
+                message.title, message.description, message.color, message.fields, message.footer, true
+            );
+            auto payloadJson = payload.dump(matjson::NO_INDENTATION);
+            if (useSync) {
+                auto const& bytes = *message.screenshotPng;
+                for (auto const& url : urls) {
+                    postWebhookSyncMultipartWithRetries(url, payloadJson, bytes, effectiveMaxRetries);
                 }
-            );
-        }
-    );
-}
-
-void postWebhookMultipartWithRetries(
-    std::string const& url,
-    std::string const& payloadJson,
-    std::shared_ptr<std::vector<std::uint8_t> const> pngBytes,
-    int attempt,
-    int maxRetries
-) {
-    if (!pngBytes) {
-        return;
-    }
-    web::MultipartForm form;
-    form.param("payload_json", payloadJson);
-    form.file("files[0]", *pngBytes, "screenshot.png", "image/png");
-    auto req = web::WebRequest();
-    req.bodyMultipart(std::move(form));
-    req.timeout(kAsyncRequestTimeout);
-
-    async::spawn(
-        req.post(url),
-        [url, payloadJson, pngBytes = std::move(pngBytes), attempt, maxRetries](
-            web::WebResponse res
-        ) mutable {
-            if (res.ok()) return;
-            auto wait = backoffSecondsForFailedAttempt(
-                res,
-                attempt,
-                maxRetries
-            );
-            if (!wait) return;
-            int const delaySec = *wait;
-            async::runtime().spawnBlocking<void>(
-                [url, payloadJson, pngBytes = std::move(pngBytes), delaySec, attempt, maxRetries]() mutable {
-                    std::this_thread::sleep_for(std::chrono::seconds(delaySec));
-                    geode::queueInMainThread(
-                        [url = std::move(url),
-                         payloadJson = std::move(payloadJson),
-                         pngBytes = std::move(pngBytes),
-                         attempt,
-                         maxRetries]() mutable {
-                            postWebhookMultipartWithRetries(
-                                url,
-                                payloadJson,
-                                std::move(pngBytes),
-                                attempt + 1,
-                                maxRetries
-                            );
-                        }
-                    );
+            }
+            else {
+                auto sharedBytes = std::make_shared<std::vector<std::uint8_t> const>(
+                    std::move(*message.screenshotPng)
+                );
+                for (auto const& url : urls) {
+                    async::spawn(postWebhookMultipartWithRetries(
+                        url, payloadJson, sharedBytes, effectiveMaxRetries
+                    ));
                 }
-            );
+            }
+            return;
         }
-    );
-}
 
-void postWebhookSyncMultipartWithRetries(
-    std::string const& url,
-    std::string const& payloadJson,
-    std::vector<std::uint8_t> const& pngBytes,
-    int attempt,
-    int maxRetries
-) {
-    web::MultipartForm form;
-    form.param("payload_json", payloadJson);
-    form.file("files[0]", pngBytes, "screenshot.png", "image/png");
-    auto req = web::WebRequest();
-    req.bodyMultipart(std::move(form));
-    req.timeout(kSyncRequestTimeout);
-
-    auto res = req.postSync(url);
-    if (res.ok()) return;
-
-    auto wait = backoffSecondsForFailedAttempt(
-        res,
-        attempt,
-        maxRetries,
-        kSyncMaxRetryDelaySeconds
-    );
-    if (!wait) return;
-
-    std::this_thread::sleep_for(
-        std::chrono::seconds(*wait)
-    );
-    postWebhookSyncMultipartWithRetries(
-        url,
-        payloadJson,
-        pngBytes,
-        attempt + 1,
-        maxRetries
-    );
-}
-
-void sendImpl(
-    bool useSync,
-    std::string const& title,
-    std::string const& description,
-    int color,
-    std::vector<WebhookField> const& fields,
-    std::string const& footer,
-    std::optional<std::vector<std::uint8_t>> screenshotPng
-) {
-    auto urls = collectWebhookTargets();
-    if (urls.empty()) {
-        return;
-    }
-    auto maxRetries = static_cast<int>(
-        Mod::get()->getSettingValue<int64_t>("max-retries")
-    );
-    if (maxRetries < 0) {
-        maxRetries = 0;
-    }
-    int const effectiveMaxRetries = useSync
-        ? std::min(maxRetries, kSyncMaxRetries)
-        : maxRetries;
-
-    bool const hasShot =
-        screenshotPng.has_value() && !screenshotPng->empty();
-
-    if (hasShot) {
         auto payload = buildWebhookPayload(
-            title,
-            description,
-            color,
-            fields,
-            footer,
-            true
+            message.title, message.description, message.color, message.fields, message.footer, false
         );
-        auto payloadJson = payload.dump(matjson::NO_INDENTATION);
         if (useSync) {
-            std::vector<std::uint8_t> const& bytes = *screenshotPng;
             for (auto const& url : urls) {
-                postWebhookSyncMultipartWithRetries(
-                    url,
-                    payloadJson,
-                    bytes,
-                    0,
-                    effectiveMaxRetries
-                );
-            }
-        } else {
-            auto sharedBytes =
-                std::make_shared<std::vector<std::uint8_t> const>(
-                    std::move(*screenshotPng)
-                );
-            for (auto const& url : urls) {
-                postWebhookMultipartWithRetries(
-                    url,
-                    payloadJson,
-                    sharedBytes,
-                    0,
-                    effectiveMaxRetries
-                );
+                postWebhookSyncWithRetries(url, matjson::Value(payload), effectiveMaxRetries);
             }
         }
-        return;
-    }
-
-    auto payload = buildWebhookPayload(
-        title,
-        description,
-        color,
-        fields,
-        footer,
-        false
-    );
-    if (useSync) {
-        for (auto const& url : urls) {
-            postWebhookSyncWithRetries(
-                url,
-                matjson::Value(payload),
-                0,
-                effectiveMaxRetries
-            );
-        }
-    } else {
-        for (auto const& url : urls) {
-            postWebhookWithRetries(
-                url,
-                matjson::Value(payload),
-                0,
-                effectiveMaxRetries
-            );
+        else {
+            for (auto const& url : urls) {
+                async::spawn(postWebhookWithRetries(url, matjson::Value(payload), effectiveMaxRetries));
+            }
         }
     }
-}
 
-matjson::Value buildContentWebhookPayload(std::string const& content) {
-    auto payload = matjson::Value::object();
-    auto username = geode::utils::string::trim(
-        Mod::get()->getSettingValue<std::string>("webhook-username"));
-    if (!username.empty()) {
-        payload["username"] = clampUtf8ByBytes(
-            std::move(username),
-            kDiscordWebhookUsernameMax,
-            "webhook username override"
-        );
+    matjson::Value buildContentWebhookPayload(std::string const& content) {
+        auto payload = matjson::Value::object();
+        auto username =
+            geode::utils::string::trim(Mod::get()->getSettingValue<std::string>("webhook-username"));
+        if (!username.empty()) {
+            payload["username"] = clampUtf8ByBytes(
+                std::move(username), kDiscordWebhookUsernameMax, "webhook username override"
+            );
+        }
+        payload["content"] = content;
+        return payload;
     }
-    payload["content"] = content;
-    return payload;
-}
 
-void sendContentImpl(std::string const& content) {
-    auto urls = collectWebhookTargets();
-    if (urls.empty()) {
-        return;
+    void sendContentImpl(std::string const& content) {
+        auto urls = collectWebhookTargets();
+        if (urls.empty()) {
+            return;
+        }
+        auto maxRetries = static_cast<int>(Mod::get()->getSettingValue<int64_t>("max-retries"));
+        if (maxRetries < 0) {
+            maxRetries = 0;
+        }
+        auto base = buildContentWebhookPayload(content);
+        for (auto const& url : urls) {
+            async::spawn(postWebhookWithRetries(url, matjson::Value(base), maxRetries));
+        }
     }
-    auto maxRetries = static_cast<int>(
-        Mod::get()->getSettingValue<int64_t>("max-retries")
-    );
-    if (maxRetries < 0) {
-        maxRetries = 0;
-    }
-    auto base = buildContentWebhookPayload(content);
-    for (auto const& url : urls) {
-        postWebhookWithRetries(
-            url,
-            matjson::Value(base),
-            0,
-            maxRetries
-        );
-    }
-}
 
 } // namespace webhook_impl
 
@@ -576,116 +392,24 @@ void sendWebhookContent(std::string const& content) {
     constexpr size_t kMaxDiscordContent = 2000;
     if (body.size() > kMaxDiscordContent) {
         log::warn(
-            "Webhook message content truncated from {} to {} characters",
-            body.size(),
-            kMaxDiscordContent
+            "Webhook message content truncated from {} to {} characters", body.size(), kMaxDiscordContent
         );
-        body.resize(kMaxDiscordContent);
+        body = text_policy::clampUtf8ByBytes(body, kMaxDiscordContent);
     }
     webhook_impl::sendContentImpl(body);
 }
 
-std::string formatDuration(int totalSeconds) {
-    auto h = totalSeconds / 3600;
-    auto m = (totalSeconds % 3600) / 60;
-    auto s = totalSeconds % 60;
-
-    auto unit = [](int n, char const* u) {
-        return fmt::format(
-            "{} {}{}",
-            n,
-            u,
-            n == 1 ? "" : "s"
-        );
-    };
-
-    std::vector<std::string> parts;
-    if (h) parts.push_back(unit(h, "hour"));
-    if (m) parts.push_back(unit(m, "minute"));
-    if (s || parts.empty()) {
-        parts.push_back(unit(s, "second"));
-    }
-    if (parts.size() == 1) return parts[0];
-    if (parts.size() == 2) {
-        return parts[0] + " and " + parts[1];
-    }
-    return parts[0] + ", " + parts[1] + " and " + parts[2];
+void sendWebhook(WebhookMessage message) {
+    webhook_impl::sendImpl(false, std::move(message));
 }
 
-std::string formatDurationMs(int64_t totalMs) {
-    if (totalMs < 0) {
-        totalMs = 0;
-    }
-    if (totalMs < 1000) {
-        if (totalMs == 0) {
-            return "0 seconds";
-        }
-        return fmt::format(
-            "{:.2f} seconds",
-            static_cast<double>(totalMs) / 1000.0
-        );
-    }
-    return formatDuration(
-        static_cast<int>(totalMs / 1000)
-    );
-}
-
-void sendWebhookDirect(
-    std::string const& title,
-    std::string const& description,
-    int color,
-    std::vector<WebhookField> const& fields,
-    std::string const& footer,
-    std::optional<std::vector<std::uint8_t>> screenshotPng
-) {
-    webhook_impl::sendImpl(
-        false,
-        title,
-        description,
-        color,
-        fields,
-        footer,
-        std::move(screenshotPng)
-    );
-}
-
-void sendWebhookDirectSync(
-    std::string const& title,
-    std::string const& description,
-    int color,
-    std::vector<WebhookField> const& fields,
-    std::string const& footer,
-    std::optional<std::vector<std::uint8_t>> screenshotPng
-) {
-    webhook_impl::sendImpl(
-        true,
-        title,
-        description,
-        color,
-        fields,
-        footer,
-        std::move(screenshotPng)
-    );
-}
-
-void sendWebhook(
-    std::string const& settingKey,
-    std::string const& title,
-    std::string const& description,
-    int color,
-    std::vector<WebhookField> const& fields,
-    std::string const& footer,
-    std::optional<std::vector<std::uint8_t>> screenshotPng
-) {
+void sendWebhookIfEnabled(std::string const& settingKey, WebhookMessage message) {
     if (!Mod::get()->getSettingValue<bool>(settingKey)) {
         return;
     }
-    sendWebhookDirect(
-        title,
-        description,
-        color,
-        fields,
-        footer,
-        std::move(screenshotPng)
-    );
+    sendWebhook(std::move(message));
+}
+
+void sendWebhookBlocking(WebhookMessage message) {
+    webhook_impl::sendImpl(true, std::move(message));
 }

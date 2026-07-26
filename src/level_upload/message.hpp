@@ -6,6 +6,6 @@ class GJGameLevel;
 
 namespace level_upload {
 
-std::string buildUploadMessage(GJGameLevel* level, bool isUpdate);
+    std::string buildUploadMessage(GJGameLevel* level, bool isUpdate);
 
 } // namespace level_upload

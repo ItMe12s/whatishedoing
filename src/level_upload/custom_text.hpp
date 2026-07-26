@@ -5,8 +5,9 @@
 
 namespace level_upload {
 
-std::filesystem::path customTextFilePath();
-void ensureDefaultCustomTextFile();
-std::string readCustomTextFile();
+    std::filesystem::path customTextFilePath();
+    void ensureDefaultCustomTextFile();
+    std::string readCustomTextFile();
+    void openCustomTextFileFromSettings();
 
 } // namespace level_upload
