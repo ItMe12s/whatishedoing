@@ -4,7 +4,6 @@ A Discord webhook logger for actions in Geometry Dash such as playing a level or
 
 ## Roadmap (Procrastinating)
 
-* ID filter for upload/update
 * All of the issues/feature request on GitHub
 
 ## Resources
