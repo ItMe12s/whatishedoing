@@ -207,6 +207,20 @@
 				"big-arrow-step": 10
 			}
 		},
+		"screenshot-delay": {
+			"type": "float",
+			"name": "Screenshot Delay",
+			"description": "Seconds to wait before capturing so death hitboxes and completion or New Best UI can appear. Set to 0 to capture immediately.",
+			"default": 0.3,
+			"min": 0.0,
+			"max": 0.5,
+			"control": {
+				"slider": true,
+				"slider-step": 0.05,
+				"arrows": true,
+				"arrow-step": 0.05
+			}
+		},
 		"other-notify-title": {
 			"type": "title",
 			"name": "Other Notification Toggles"

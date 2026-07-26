@@ -16,7 +16,7 @@ constexpr char const* kProfileNamesKey = "profile-names";
 constexpr char const* kActiveCustomTextSlotKey = "active-custom-text-slot";
 constexpr std::size_t kMaxNameLength = 32;
 
-std::array<TrackedKey, 43> const kTracked{{
+std::array<TrackedKey, 44> const kTracked{{
     {"webhook-url", Kind::String},
     {"extra-webhook-url-1", Kind::String},
     {"extra-webhook-url-2", Kind::String},
@@ -44,6 +44,7 @@ std::array<TrackedKey, 43> const kTracked{{
     {"screenshot-new-best", Kind::Bool},
     {"screenshot-death", Kind::Bool},
     {"screenshot-scale-percent", Kind::Int},
+    {"screenshot-delay", Kind::Float},
     {"notify-level-upload", Kind::Bool},
     {"upload-send-on-update", Kind::Bool},
     {"upload-use-custom-text", Kind::Bool},
@@ -100,6 +101,9 @@ matjson::Value snapshotCurrentSettings() {
             case Kind::Int:
                 out[t.key] = Mod::get()->getSettingValue<int64_t>(t.key);
                 break;
+            case Kind::Float:
+                out[t.key] = Mod::get()->getSettingValue<double>(t.key);
+                break;
             case Kind::String:
                 out[t.key] =
                     Mod::get()->getSettingValue<std::string>(t.key);
@@ -142,6 +146,13 @@ void applyBlobToSettings(matjson::Value const& blob) {
                 }
                 break;
             }
+            case Kind::Float: {
+                auto r = v.asDouble();
+                if (r.isOk()) {
+                    Mod::get()->setSettingValue<double>(t.key, r.unwrap());
+                }
+                break;
+            }
             case Kind::String: {
                 auto r = v.asString();
                 if (r.isOk()) {
@@ -174,7 +185,7 @@ void applyBlobToSettings(matjson::Value const& blob) {
 
 } // namespace
 
-std::array<TrackedKey, 43> const& trackedKeys() {
+std::array<TrackedKey, 44> const& trackedKeys() {
     return kTracked;
 }
 

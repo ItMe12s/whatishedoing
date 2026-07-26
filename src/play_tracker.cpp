@@ -4,14 +4,19 @@
 #include <Geode/binding/PlayLayer.hpp>
 #include <Geode/modify/EndLevelLayer.hpp>
 #include <Geode/modify/PlayLayer.hpp>
+#include <Geode/utils/cocos.hpp>
 #include <Geode/utils/general.hpp>
 #include <Geode/utils/string.hpp>
 #include <algorithm>
 #include <cmath>
+#include <cstdint>
 #include <deque>
 #include <cvolton.level-id-api/include/EditorIDs.hpp>
+#include <functional>
+#include <memory>
 #include <optional>
 #include <string>
+#include <utility>
 #include <vector>
 
 #include "embed_colors.hpp"
@@ -88,6 +93,103 @@ int screenshotScalePercent() {
     );
 }
 
+float screenshotDelaySeconds() {
+    return std::clamp(
+        static_cast<float>(
+            Mod::get()->getSettingValue<double>("screenshot-delay")
+        ),
+        0.f,
+        0.5f
+    );
+}
+
+using ScreenshotCallback = std::function<void(
+    std::optional<std::vector<std::uint8_t>>
+)>;
+
+void captureScreenshotThen(
+    PlayLayer* layer,
+    std::function<bool()> const& isStillValid,
+    ScreenshotCallback callback
+) {
+    if (!layer || PlayLayer::get() != layer || !isStillValid()) {
+        callback(std::nullopt);
+        return;
+    }
+    auto capOpt = capturePlayLayerScreenshotRgba(layer);
+    if (!capOpt) {
+        callback(std::nullopt);
+        return;
+    }
+    spawnScreenshotEncodeToPngThen(
+        std::move(*capOpt),
+        screenshotScalePercent(),
+        std::move(callback)
+    );
+}
+
+struct PendingScreenshotCapture {
+    PlayLayer* layer;
+    std::function<bool()> m_isStillValid;
+    ScreenshotCallback m_callback;
+
+    PendingScreenshotCapture(
+        PlayLayer* layer,
+        std::function<bool()> isStillValid,
+        ScreenshotCallback callback
+    )
+      : layer(layer),
+        m_isStillValid(std::move(isStillValid)),
+        m_callback(std::move(callback)) {}
+
+    void capture() {
+        captureScreenshotThen(
+            layer,
+            m_isStillValid,
+            std::move(m_callback)
+        );
+    }
+
+    ~PendingScreenshotCapture() {
+        if (m_callback) {
+            m_callback(std::nullopt);
+        }
+    }
+};
+
+void captureScreenshotAfterDelay(
+    PlayLayer* layer,
+    std::function<bool()> isStillValid,
+    ScreenshotCallback callback
+) {
+    float const delay = screenshotDelaySeconds();
+    if (delay <= 0.f) {
+        captureScreenshotThen(
+            layer,
+            isStillValid,
+            std::move(callback)
+        );
+        return;
+    }
+    auto* scene = CCDirector::sharedDirector()->getRunningScene();
+    if (!scene) {
+        callback(std::nullopt);
+        return;
+    }
+    auto pending = std::make_shared<PendingScreenshotCapture>(
+        layer,
+        std::move(isStillValid),
+        std::move(callback)
+    );
+    scene->runAction(CCSequence::create(
+        CCDelayTime::create(delay),
+        geode::cocos::CallFuncExt::create([pending] {
+            pending->capture();
+        }),
+        nullptr
+    ));
+}
+
 void reopenLevelSessionIfNeeded(PlayLayer* layer) {
     auto& session = levelSession();
     if (session.active || !layer->m_level) {
@@ -114,7 +216,8 @@ void reopenLevelSessionIfNeeded(PlayLayer* layer) {
 void sendDeathWebhookIfNeeded(
     PlayLayer* layer,
     int currentPercent,
-    int bestBefore
+    int bestBefore,
+    std::function<bool()> captureStillValid
 ) {
     auto& session = levelSession();
     if (!session.active || !layer || !layer->m_level) {
@@ -175,6 +278,7 @@ void sendDeathWebhookIfNeeded(
     int const sessionLevelID = session.levelID;
     std::string const sessionLevelName = session.levelName;
     auto const sessionAttemptStart = session.attemptStart;
+    session.deathNotified = true;
     auto sendDeath =
         [=](std::optional<std::vector<std::uint8_t>> shot) {
             if (fromStartpos) {
@@ -223,36 +327,29 @@ void sendDeathWebhookIfNeeded(
                     std::move(shot)
                 );
             }
-            if (matchesLevelSession(
-                    sessionLevelID,
-                    sessionLevelName,
-                    sessionAttemptStart
-                )) {
-                levelSession().deathNotified = true;
-            }
         };
     if (!Mod::get()->getSettingValue<bool>("screenshot-death")) {
         sendDeath(std::nullopt);
         return;
     }
-    auto capOpt = capturePlayLayerScreenshotRgba(layer);
-    if (!capOpt) {
-        sendDeath(std::nullopt);
-        return;
-    }
-    spawnScreenshotEncodeToPngThen(
-        std::move(*capOpt),
-        screenshotScalePercent(),
-        [=](std::optional<std::vector<std::uint8_t>> shot) {
-            sendDeath(std::move(shot));
-        }
+    captureScreenshotAfterDelay(
+        layer,
+        [=] {
+            return captureStillValid() && matchesLevelSession(
+                sessionLevelID,
+                sessionLevelName,
+                sessionAttemptStart
+            );
+        },
+        std::move(sendDeath)
     );
 }
 
 void sendNewBestWebhookIfNeeded(
     PlayLayer* playLayer,
-    int pctAtDeath = -1,
-    int bestBeforeDeath = -1
+    int pctAtDeath,
+    int bestBeforeDeath,
+    std::function<bool()> captureStillValid
 ) {
     if (!Mod::get()->getSettingValue<bool>("notify-new-best")) {
         return;
@@ -307,6 +404,9 @@ void sendNewBestWebhookIfNeeded(
         return;
     }
     session.bestNotifiedPercent = effectiveBest;
+    int const sessionLevelID = session.levelID;
+    std::string const sessionLevelName = session.levelName;
+    auto const sessionAttemptStart = session.attemptStart;
     auto sendNewBest =
         [=](std::optional<std::vector<std::uint8_t>> shot) {
             sendWebhookDirect(
@@ -332,17 +432,16 @@ void sendNewBestWebhookIfNeeded(
         sendNewBest(std::nullopt);
         return;
     }
-    auto capOpt = capturePlayLayerScreenshotRgba(playLayer);
-    if (!capOpt) {
-        sendNewBest(std::nullopt);
-        return;
-    }
-    spawnScreenshotEncodeToPngThen(
-        std::move(*capOpt),
-        screenshotScalePercent(),
-        [=](std::optional<std::vector<std::uint8_t>> shot) {
-            sendNewBest(std::move(shot));
-        }
+    captureScreenshotAfterDelay(
+        playLayer,
+        [=] {
+            return captureStillValid() && matchesLevelSession(
+                sessionLevelID,
+                sessionLevelName,
+                sessionAttemptStart
+            );
+        },
+        std::move(sendNewBest)
     );
 }
 
@@ -465,6 +564,7 @@ class $modify(MyPlayLayer, PlayLayer) {
         double rollingRealSum = 0;
         double rollingGameSum = 0;
         double currentTimeWarp = 1;
+        std::uint64_t screenshotEpoch = 0;
     };
 
     static void onModify(auto& self) {
@@ -637,6 +737,7 @@ class $modify(MyPlayLayer, PlayLayer) {
         return true;
     }
     void resetLevel() {
+        ++m_fields->screenshotEpoch;
         resetSpeedhackSamples();
         PlayLayer::resetLevel();
         reopenLevelSessionIfNeeded(this);
@@ -682,14 +783,24 @@ class $modify(MyPlayLayer, PlayLayer) {
                 ? pre.color()
                 : embed_color::levelComplete();
         bool const fromStartpos = m_isTestMode && !pre.practice;
+        int const completeStartPercentSnapshot = pre.startPercent;
         int const sessionLevelID = pre.levelID;
         std::string const sessionLevelName = pre.levelName;
         auto const sessionAttemptStart = pre.attemptStart;
         std::string const completeTitleSnapshot = pre.completeTitle();
         PlayLayer::levelComplete();
+        auto const screenshotEpoch = ++m_fields->screenshotEpoch;
+        auto const captureStillValid = [this, screenshotEpoch] {
+            return m_fields->screenshotEpoch == screenshotEpoch;
+        };
         bool const progressLegal = isProgressLegal();
         if (progressLegal) {
-            sendNewBestWebhookIfNeeded(this);
+            sendNewBestWebhookIfNeeded(
+                this,
+                -1,
+                -1,
+                captureStillValid
+            );
         } else {
             markCurrentBestHandled(this);
         }
@@ -701,100 +812,66 @@ class $modify(MyPlayLayer, PlayLayer) {
         if (!suppress && progressLegal) {
             if (fromStartpos) {
                 auto* layer = this;
-                geode::queueInMainThread(
-                    [=] {
-                        if (!progressLegal) {
-                            return;
-                        }
-                        if (!matchesLevelSession(
-                                sessionLevelID,
-                                sessionLevelName,
-                                sessionAttemptStart
-                            )) {
-                            return;
-                        }
-                        auto const minSeg = static_cast<int>(
-                            Mod::get()->getSettingValue<int64_t>(
-                                "startpos-death-min-progress"
-                            ));
-                        int const completeStartPercentSnapshot =
-                            levelSession().startPercent;
-                        int const progress =
-                            100 - completeStartPercentSnapshot;
-                        if (progress >= 0 && progress >= minSeg) {
-                            auto fireWebhook =
-                                [=](std::optional<
-                                    std::vector<std::uint8_t>> shot) {
-                                    sendWebhook(
-                                        "notify-level-complete",
-                                        "Startpos Complete!",
-                                        fmt::format(
-                                            "{} got a **{}-{}%** run on "
-                                            "**{}** by **{}**.",
-                                            playerName,
-                                            completeStartPercentSnapshot,
-                                            100,
-                                            display.levelName,
-                                            display.creatorName
-                                        ),
-                                        completeColor,
+                geode::queueInMainThread([=] {
+                    bool const sameSession = matchesLevelSession(
+                        sessionLevelID,
+                        sessionLevelName,
+                        sessionAttemptStart
+                    );
+                    int const startPercent = completeStartPercentSnapshot;
+                    auto const minSeg = static_cast<int>(
+                        Mod::get()->getSettingValue<int64_t>(
+                            "startpos-death-min-progress"
+                        ));
+                    int const progress = 100 - startPercent;
+                    if (progress >= 0 && progress >= minSeg) {
+                        auto fireWebhook =
+                            [=](std::optional<std::vector<std::uint8_t>> shot) {
+                                sendWebhook(
+                                    "notify-level-complete",
+                                    "Startpos Complete!",
+                                    fmt::format(
+                                        "{} got a **{}-{}%** run on "
+                                        "**{}** by **{}**.",
+                                        playerName,
+                                        startPercent,
+                                        100,
+                                        display.levelName,
+                                        display.creatorName
+                                    ),
+                                    completeColor,
+                                    {
+                                        {"Level", display.levelName, true},
+                                        {"Creator", display.creatorName, true},
                                         {
-                                            {
-                                                "Level",
-                                                display.levelName,
-                                                true
-                                            },
-                                            {
-                                                "Creator",
-                                                display.creatorName,
-                                                true
-                                            },
-                                            {
-                                                "Run",
-                                                fmt::format(
-                                                    "{}-100%",
-                                                    completeStartPercentSnapshot
-                                                ),
-                                                true
-                                            },
+                                            "Run",
+                                            fmt::format(
+                                                "{}-100%",
+                                                startPercent
+                                            ),
+                                            true
                                         },
-                                        elapsed,
-                                        std::move(shot)
-                                    );
-                                };
-                            if (!Mod::get()->getSettingValue<bool>(
-                                    "screenshot-level-complete"
-                                )) {
-                                fireWebhook(std::nullopt);
-                            } else if (PlayLayer::get() != layer) {
-                                fireWebhook(std::nullopt);
-                            } else {
-                                auto capOpt =
-                                    capturePlayLayerScreenshotRgba(layer);
-                                if (!capOpt) {
-                                    fireWebhook(std::nullopt);
-                                } else {
-                                    spawnScreenshotEncodeToPngThen(
-                                        std::move(*capOpt),
-                                        screenshotScalePercent(),
-                                        [=](std::optional<
-                                            std::vector<std::uint8_t>>
-                                            shot) {
-                                            fireWebhook(std::move(shot));
-                                        }
-                                    );
-                                }
-                            }
-                        }
-                        if (matchesLevelSession(
-                                sessionLevelID,
-                                sessionLevelName,
-                                sessionAttemptStart
+                                    },
+                                    elapsed,
+                                    std::move(shot)
+                                );
+                            };
+                        if (!Mod::get()->getSettingValue<bool>(
+                                "screenshot-level-complete"
                             )) {
-                            levelSession().reset();
+                            fireWebhook(std::nullopt);
+                        } else {
+                            captureScreenshotAfterDelay(
+                                layer,
+                                captureStillValid,
+                                std::move(fireWebhook)
+                            );
                         }
                     }
-                );
+                    if (sameSession) {
+                        levelSession().reset();
+                    }
+                });
                 clearCheatState();
                 return;
             } else {
@@ -825,19 +902,11 @@ class $modify(MyPlayLayer, PlayLayer) {
                     )) {
                     fireWebhook(std::nullopt);
                 } else {
-                    auto capOpt = capturePlayLayerScreenshotRgba(this);
-                    if (!capOpt) {
-                        fireWebhook(std::nullopt);
-                    } else {
-                        spawnScreenshotEncodeToPngThen(
-                            std::move(*capOpt),
-                            screenshotScalePercent(),
-                            [=](std::optional<
-                                std::vector<std::uint8_t>> shot) {
-                                fireWebhook(std::move(shot));
-                            }
-                        );
-                    }
+                    captureScreenshotAfterDelay(
+                        this,
+                        captureStillValid,
+                        std::move(fireWebhook)
+                    );
                 }
             }
         }
@@ -845,6 +914,7 @@ class $modify(MyPlayLayer, PlayLayer) {
         levelSession().reset();
     }
     void onQuit() {
+        ++m_fields->screenshotEpoch;
         auto& session = levelSession();
         if (!session.active) {
             clearCompletedLevelExit(this);
@@ -898,6 +968,10 @@ class $modify(MyPlayLayer, PlayLayer) {
             ? static_cast<int>(m_level->m_newNormalPercent2.value())
             : 0;
         PlayLayer::destroyPlayer(player, object);
+        auto const screenshotEpoch = m_fields->screenshotEpoch;
+        auto const captureStillValid = [this, screenshotEpoch] {
+            return m_fields->screenshotEpoch == screenshotEpoch;
+        };
         resetSpeedhackSamples();
         if (!m_fields->disabledCheat) {
             m_fields->disabledCheat = object;
@@ -910,12 +984,22 @@ class $modify(MyPlayLayer, PlayLayer) {
         syncPlayMode(this);
         bool const progressLegal = isProgressLegal();
         if (progressLegal && pctBefore > 0) {
-            sendNewBestWebhookIfNeeded(this, pctBefore, bestBefore);
+            sendNewBestWebhookIfNeeded(
+                this,
+                pctBefore,
+                bestBefore,
+                captureStillValid
+            );
         } else if (pctBefore > 0) {
             markCurrentBestHandled(this, pctBefore, bestBefore);
         }
         if (trackDeath && progressLegal) {
-            sendDeathWebhookIfNeeded(this, pctBefore, bestBefore);
+            sendDeathWebhookIfNeeded(
+                this,
+                pctBefore,
+                bestBefore,
+                captureStillValid
+            );
         }
     }
     void postUpdate(float dt) {

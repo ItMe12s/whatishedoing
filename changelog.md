@@ -4,7 +4,7 @@ Currently no announcements for this mod.
 
 ## 1.4.4
 
-add stuff here
+- Configurable screenshot delay
 
 ## 1.4.3
 
