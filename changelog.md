@@ -2,6 +2,11 @@
 
 Currently no announcements for this mod.
 
+## 1.5.1
+
+- New screenshot resizer
+- Internal improvements
+
 ## 1.5.0
 
 - Rewrote the whole mod

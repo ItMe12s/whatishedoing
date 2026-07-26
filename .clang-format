@@ -72,6 +72,8 @@ IncludeBlocks: Regroup
 IncludeCategories:
   - Regex: '^".*"'
     Priority: 1
+  - Regex: '^<Geode/utils/timer\.hpp>$'
+    Priority: 3
   - Regex: '^<.*>'
     Priority: 2
 
