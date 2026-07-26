@@ -39,10 +39,6 @@ namespace profile {
             btn->setOpacity(alpha);
         }
 
-        std::string profileNodeId(std::string const& local) {
-            return Mod::get()->expandSpriteName(local);
-        }
-
         CCMenuItemSpriteExtra* makeActionButton(
             std::size_t index, char const* label, char const* background, char const* idSuffix,
             geode::Function<void(CCMenuItemSpriteExtra*)> callback
@@ -50,7 +46,9 @@ namespace profile {
             auto* sprite = ButtonSprite::create(label, "bigFont.fnt", background, .8f);
             sprite->setScale(.45f);
             auto* button = cocos::CCMenuItemExt::createSpriteExtra(sprite, std::move(callback));
-            button->setID(profileNodeId(fmt::format("profile-slot-{}-{}", index, idSuffix)));
+            button->setID(
+                Mod::get()->expandSpriteName(fmt::format("profile-slot-{}-{}", index, idSuffix))
+            );
             return button;
         }
 
@@ -62,7 +60,6 @@ namespace profile {
             });
         }
 
-        // Popup::onClose is protected, so mirror its teardown for the settings popup.
         void closeGeodePopupLikePopup(geode::Popup* p) {
             if (!p) return;
             geode::Popup::CloseEvent(p).send();
@@ -78,20 +75,20 @@ namespace profile {
 
         auto* row = CCNode::create();
         row->setContentSize({width, kRowHeight});
-        row->setID(profileNodeId(fmt::format("profile-slot-row-{}", idx)));
+        row->setID(Mod::get()->expandSpriteName(fmt::format("profile-slot-row-{}", idx)));
 
         auto* label = CCLabelBMFont::create(slot.c_str(), "bigFont.fnt");
         label->setScale(kNameLabelScale);
         label->setAnchorPoint({0.f, .5f});
         label->setPosition({4.f, kRowHeight * .5f});
-        label->setID(profileNodeId(fmt::format("profile-slot-{}-name", idx)));
+        label->setID(Mod::get()->expandSpriteName(fmt::format("profile-slot-{}-name", idx)));
         row->addChild(label);
 
         auto* status = CCLabelBMFont::create("", "chatFont.fnt");
         status->setScale(.55f);
         status->setAnchorPoint({0.f, .5f});
         status->setPosition({120.f, kRowHeight * .5f});
-        status->setID(profileNodeId(fmt::format("profile-slot-{}-status", idx)));
+        status->setID(Mod::get()->expandSpriteName(fmt::format("profile-slot-{}-status", idx)));
         row->addChild(status);
 
         auto* menu = CCMenu::create();
@@ -106,7 +103,7 @@ namespace profile {
                 ->setCrossAxisAlignment(AxisAlignment::Center)
                 ->setPadding(Padding(0.f, 0.f, kActionsMenuRightPadding, 0.f))
         );
-        menu->setID(profileNodeId(fmt::format("profile-slot-{}-actions", idx)));
+        menu->setID(Mod::get()->expandSpriteName(fmt::format("profile-slot-{}-actions", idx)));
         row->addChild(menu);
 
         menu->addChild(makeActionButton(idx, "Rename", "GJ_button_04.png", "rename", [this, idx](auto*) {
@@ -133,31 +130,35 @@ namespace profile {
         auto const slot = slotNameAt(idx);
         bool const filled = slotIsFilled(slot);
 
-        if (auto* label = typeinfo_cast<CCLabelBMFont*>(
-                row->getChildByID(profileNodeId(fmt::format("profile-slot-{}-name", idx)))
-            )) {
+        if (auto* label = typeinfo_cast<CCLabelBMFont*>(row->getChildByID(
+                Mod::get()->expandSpriteName(fmt::format("profile-slot-{}-name", idx))
+            ))) {
             label->setString(slot.c_str());
             label->limitLabelWidth(kNameLabelMaxWidth, kNameLabelScale, kNameLabelMinScale);
         }
-        if (auto* status = typeinfo_cast<CCLabelBMFont*>(
-                row->getChildByID(profileNodeId(fmt::format("profile-slot-{}-status", idx)))
-            )) {
+        if (auto* status = typeinfo_cast<CCLabelBMFont*>(row->getChildByID(
+                Mod::get()->expandSpriteName(fmt::format("profile-slot-{}-status", idx))
+            ))) {
             status->setString(filled ? "saved" : "empty");
             status->setColor(filled ? ccc3(120, 220, 120) : ccc3(180, 180, 180));
         }
-        auto* menu = typeinfo_cast<CCMenu*>(
-            row->getChildByID(profileNodeId(fmt::format("profile-slot-{}-actions", idx)))
-        );
+        auto* menu = typeinfo_cast<CCMenu*>(row->getChildByID(
+            Mod::get()->expandSpriteName(fmt::format("profile-slot-{}-actions", idx))
+        ));
         styleLoadDeleteButton(
             typeinfo_cast<CCMenuItemSpriteExtra*>(
-                menu ? menu->getChildByID(profileNodeId(fmt::format("profile-slot-{}-delete", idx))) :
+                menu ? menu->getChildByID(
+                           Mod::get()->expandSpriteName(fmt::format("profile-slot-{}-delete", idx))
+                       ) :
                        nullptr
             ),
             filled
         );
         styleLoadDeleteButton(
             typeinfo_cast<CCMenuItemSpriteExtra*>(
-                menu ? menu->getChildByID(profileNodeId(fmt::format("profile-slot-{}-load", idx))) :
+                menu ? menu->getChildByID(
+                           Mod::get()->expandSpriteName(fmt::format("profile-slot-{}-load", idx))
+                       ) :
                        nullptr
             ),
             filled
@@ -202,18 +203,6 @@ namespace profile {
         return true;
     }
 
-    namespace {
-
-        CCNode* findSlotRowForIndex(ProfileManagerPopup* popup, std::size_t idx) {
-            if (!popup) {
-                return nullptr;
-            }
-            auto const wantId = profileNodeId(fmt::format("profile-slot-row-{}", idx));
-            return popup->getChildByIDRecursive(wantId);
-        }
-
-    } // namespace
-
     void ProfileManagerPopup::onSaveSlot(std::size_t idx) {
         auto const slot = slotNameAt(idx);
         bool const hadData = slotIsFilled(slot);
@@ -232,7 +221,9 @@ namespace profile {
             [popup, idx, slot](FLAlertLayer*, bool ok) {
                 if (!ok) return;
                 snapshotIntoSlot(slot);
-                if (auto* row = findSlotRowForIndex(popup, idx)) {
+                if (auto* row = popup->getChildByIDRecursive(
+                        Mod::get()->expandSpriteName(fmt::format("profile-slot-row-{}", idx))
+                    )) {
                     popup->refreshRow(row, idx);
                 }
                 Notification::create(fmt::format("Saved to {}", slot), NotificationIcon::Success, 1.5f)
@@ -295,7 +286,9 @@ namespace profile {
                 if (activeCustomTextSlotIndex() == idx) {
                     setActiveCustomTextSlotIndex(0);
                 }
-                if (auto* row = findSlotRowForIndex(popup, idx)) {
+                if (auto* row = popup->getChildByIDRecursive(
+                        Mod::get()->expandSpriteName(fmt::format("profile-slot-row-{}", idx))
+                    )) {
                     popup->refreshRow(row, idx);
                 }
                 Notification::create(fmt::format("Cleared {}", slot), NotificationIcon::Info, 1.5f)
@@ -314,7 +307,9 @@ namespace profile {
                         Notification::create(res.unwrapErr(), NotificationIcon::Error, 2.f)->show();
                         return;
                     }
-                    if (auto* row = findSlotRowForIndex(popup, idx)) {
+                    if (auto* row = popup->getChildByIDRecursive(
+                            Mod::get()->expandSpriteName(fmt::format("profile-slot-row-{}", idx))
+                        )) {
                         popup->refreshRow(row, idx);
                     }
                 }

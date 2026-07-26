@@ -8,14 +8,6 @@
 
 namespace text_policy {
 
-    std::string clampUtf8ByBytes(std::string_view text, std::size_t maxBytes) {
-        auto end = std::min(text.size(), maxBytes);
-        while (end && end < text.size() && (static_cast<unsigned char>(text[end]) & 0xc0) == 0x80) {
-            --end;
-        }
-        return std::string(text.substr(0, end));
-    }
-
     std::string formatDuration(int totalSeconds) {
         int const hours = totalSeconds / 3600;
         int const minutes = (totalSeconds % 3600) / 60;

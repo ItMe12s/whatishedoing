@@ -4,6 +4,8 @@
 #include "level_filter.hpp"
 
 #include <Geode/Geode.hpp>
+#include <Geode/utils/general.hpp>
+#include <Geode/utils/ranges.hpp>
 #include <string>
 
 using namespace geode::prelude;
@@ -96,7 +98,9 @@ void setIdInFilterList(int id, bool inList) {
     else {
         ids.erase(id);
     }
-    auto const out = level_filter::serializeLevelIds(ids);
+    auto const out = geode::utils::ranges::join(ids, std::string(","), [](int value) {
+        return geode::utils::numToString(value);
+    });
     Mod::get()->setSettingValue<std::string>("level-filter-ids", out);
 }
 

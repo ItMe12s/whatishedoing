@@ -23,7 +23,7 @@ namespace play_events {
     namespace {
 
         struct PendingCompletedLevelExit {
-            PlayLayer* layer = nullptr;
+            WeakRef<PlayLayer> layer;
             int levelID = kLevelSessionClearedId;
             std::string levelName;
             std::string creatorName;
@@ -287,11 +287,17 @@ namespace play_events {
     }
 
     void clearCompletedLevelExit(PlayLayer* layer) {
-        if (s_pendingCompletedLevelExit && s_pendingCompletedLevelExit->layer == layer) {
-            s_pendingCompletedLevelExit.reset();
+        if (s_pendingCompletedLevelExit) {
+            auto pendingLayer = s_pendingCompletedLevelExit->layer.lock();
+            if (!pendingLayer || pendingLayer.data() == layer) {
+                s_pendingCompletedLevelExit.reset();
+            }
         }
-        if (s_sentCompletedLevelExit && s_sentCompletedLevelExit->layer == layer) {
-            s_sentCompletedLevelExit.reset();
+        if (s_sentCompletedLevelExit) {
+            auto sentLayer = s_sentCompletedLevelExit->layer.lock();
+            if (!sentLayer || sentLayer.data() == layer) {
+                s_sentCompletedLevelExit.reset();
+            }
         }
     }
 
@@ -309,7 +315,12 @@ namespace play_events {
     }
 
     void sendCompletedLevelExitIfQueued(PlayLayer* layer) {
-        if (!s_pendingCompletedLevelExit || s_pendingCompletedLevelExit->layer != layer) {
+        if (!s_pendingCompletedLevelExit) {
+            return;
+        }
+        auto pendingLayer = s_pendingCompletedLevelExit->layer.lock();
+        if (!pendingLayer || pendingLayer.data() != layer) {
+            s_pendingCompletedLevelExit.reset();
             return;
         }
         auto pending = std::move(*s_pendingCompletedLevelExit);
@@ -342,7 +353,12 @@ namespace play_events {
     }
 
     bool consumeSentCompletedLevelExit(PlayLayer* layer) {
-        if (!s_sentCompletedLevelExit || s_sentCompletedLevelExit->layer != layer) {
+        if (!s_sentCompletedLevelExit) {
+            return false;
+        }
+        auto sentLayer = s_sentCompletedLevelExit->layer.lock();
+        if (!sentLayer || sentLayer.data() != layer) {
+            s_sentCompletedLevelExit.reset();
             return false;
         }
         auto const& sent = *s_sentCompletedLevelExit;

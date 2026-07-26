@@ -6,10 +6,10 @@
 #include <Geode/utils/cocos.hpp>
 #include <Geode/utils/file.hpp>
 #include <Geode/utils/general.hpp>
+#include <Geode/utils/random.hpp>
 #include <Geode/utils/string.hpp>
 #include <algorithm>
 #include <array>
-#include <atomic>
 #include <cmath>
 #include <cocos2d.h>
 #include <filesystem>
@@ -23,13 +23,6 @@ using namespace cocos2d;
 
 // https://www.kevincao.xyz/posts/image-resizing
 namespace {
-
-    std::atomic<std::uint64_t> g_encodeTmpSeq{0};
-
-    std::filesystem::path uniqueEncodeTmpPath() {
-        auto const n = g_encodeTmpSeq.fetch_add(1, std::memory_order_relaxed);
-        return Mod::get()->getTempDir() / fmt::format("whatishedoing_cap_{}.png", n);
-    }
 
     double lanczos2(double x) {
         constexpr double a = 2;
@@ -265,7 +258,8 @@ std::optional<CapturedScreenshotRgba> capturePlayLayerScreenshotRgba(PlayLayer* 
 void spawnScreenshotEncodeToPngThen(
     CapturedScreenshotRgba captured, int scalePct, ScreenshotCallback onMainThread
 ) {
-    auto const tmp = uniqueEncodeTmpPath();
+    auto const tmp = Mod::get()->getTempDir() /
+        fmt::format("whatishedoing_cap_{}.png", geode::utils::random::generateUUID());
     auto task = geode::async::runtime().spawnBlocking<ScreenshotPng>(
         [cap = std::move(captured), scalePct, tmp]() mutable {
             return encodeRgbaToPngBytes(std::move(cap.rgba), cap.width, cap.height, scalePct, tmp);
@@ -275,16 +269,6 @@ void spawnScreenshotEncodeToPngThen(
 }
 
 namespace {
-
-    int screenshotScalePercent() {
-        return static_cast<int>(Mod::get()->getSettingValue<int64_t>("screenshot-scale-percent"));
-    }
-
-    float screenshotDelaySeconds() {
-        return std::clamp(
-            static_cast<float>(Mod::get()->getSettingValue<double>("screenshot-delay")), 0.f, 0.5f
-        );
-    }
 
     void captureScreenshotThen(
         PlayLayer* layer, geode::FunctionRef<bool()> isStillValid, ScreenshotCallback callback
@@ -299,7 +283,9 @@ namespace {
             return;
         }
         spawnScreenshotEncodeToPngThen(
-            std::move(*captured), screenshotScalePercent(), std::move(callback)
+            std::move(*captured),
+            static_cast<int>(Mod::get()->getSettingValue<int64_t>("screenshot-scale-percent")),
+            std::move(callback)
         );
     }
 
@@ -330,7 +316,9 @@ namespace {
 void capturePlayLayerScreenshotAfterDelay(
     PlayLayer* playLayer, ScreenshotValidity isStillValid, ScreenshotCallback onMainThread
 ) {
-    float const delay = screenshotDelaySeconds();
+    float const delay = std::clamp(
+        static_cast<float>(Mod::get()->getSettingValue<double>("screenshot-delay")), 0.f, 0.5f
+    );
     if (delay <= 0.f) {
         captureScreenshotThen(playLayer, isStillValid, std::move(onMainThread));
         return;

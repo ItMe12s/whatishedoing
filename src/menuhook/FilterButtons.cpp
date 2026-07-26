@@ -93,7 +93,6 @@ struct WIHLevelInfoLayer : Modify<WIHLevelInfoLayer, LevelInfoLayer> {
         button->setVisible(false);
         otherMenu->addChild(button);
 
-        // Preserve the existing placement relative to the stock controls.
         float const step = button->getScaledContentSize().width;
         if (cocos::nodeIsVisible(favoriteButton)) {
             button->setPosition(
@@ -132,7 +131,6 @@ struct WIHEditLevelLayer : Modify<WIHEditLevelLayer, EditLevelLayer> {
         button->setZOrder(1);
         menu->addChild(button);
 
-        // Preserve compatibility with the neighboring third-party button.
         float const step = button->getScaledContentSize().width;
         button->setPosition(
             ccp(infoButton->getPositionX() + 2.f * step, infoButton->getPositionY() + step)

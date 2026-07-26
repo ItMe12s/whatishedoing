@@ -32,17 +32,6 @@ namespace level_filter {
         return ids;
     }
 
-    std::string serializeLevelIds(LevelIds const& ids) {
-        std::string out;
-        for (int id : ids) {
-            if (!out.empty()) {
-                out.push_back(',');
-            }
-            out += std::to_string(id);
-        }
-        return out;
-    }
-
     Mode parseMode(std::string_view raw) noexcept {
         return raw == "Blacklist" ? Mode::Blacklist :
             raw == "Whitelist"    ? Mode::Whitelist :

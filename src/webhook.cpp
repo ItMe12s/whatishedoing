@@ -1,7 +1,6 @@
 #include "webhook.hpp"
 
 #include "retry_policy.hpp"
-#include "text_policy.hpp"
 
 #include <Geode/Geode.hpp>
 #include <Geode/utils/async.hpp>
@@ -39,12 +38,24 @@ namespace webhook_impl {
     constexpr size_t kDiscordWebhookUsernameMax = 80;
     constexpr size_t kDiscordEmbedFieldCountMax = 25;
 
-    static std::string clampUtf8ByBytes(std::string s, size_t maxBytes, char const* ctx) {
-        if (s.size() <= maxBytes) {
-            return s;
+    static Result<std::string> truncateDiscordText(
+        std::string_view text, size_t maxCharacters, char const* context
+    ) {
+        if (text.empty()) {
+            return Ok(std::string());
         }
-        log::warn("{} truncated from {} to {} bytes", ctx, s.size(), maxBytes);
-        return text_policy::clampUtf8ByBytes(s, maxBytes);
+        auto decoded = geode::utils::string::utf8ToUtf32(text);
+        if (decoded.isErr()) {
+            log::error("Invalid UTF-8 in {}, webhook request skipped", context);
+            return Err("Invalid UTF-8");
+        }
+        auto codePoints = std::move(decoded).unwrap();
+        if (codePoints.size() <= maxCharacters) {
+            return Ok(std::string(text));
+        }
+        log::warn("{} truncated from {} to {} characters", context, codePoints.size(), maxCharacters);
+        codePoints.resize(maxCharacters);
+        return geode::utils::string::utf32ToUtf8(codePoints);
     }
 
     static bool isAllowedDiscordWebhookHost(std::string const& hostLower) {
@@ -58,16 +69,15 @@ namespace webhook_impl {
     }
 
     static std::string_view safeWebErrorMessage(web::WebResponse const& res) {
+        static auto const kSecretMarkers =
+            std::to_array<std::string>({"://", "/api/webhooks/", "\r", "\n"});
         auto const error = res.errorMessage();
-        if (error.empty() || geode::utils::string::contains(error, "://") ||
-            geode::utils::string::contains(error, "/api/webhooks/") ||
-            error.find_first_of("\r\n") != std::string_view::npos) {
+        if (error.empty() || geode::utils::string::containsAny(error, kSecretMarkers)) {
             return {};
         }
         return error;
     }
 
-    // Returns nullopt if the URL is missing or not suitable for a Discord webhook POST.
     std::optional<std::string> normalizeWebhookUrl(std::string const& raw) {
         std::string url = raw;
         geode::utils::string::trimIP(url);
@@ -136,17 +146,23 @@ namespace webhook_impl {
         );
     }
 
-    matjson::Value buildWebhookPayload(
+    Result<matjson::Value> buildWebhookPayload(
         std::string const& title, std::string const& description, int color,
         std::vector<WebhookField> const& fields, std::string const& footer,
         bool embedScreenshotAttachment
     ) {
-        auto const titleClamped =
-            clampUtf8ByBytes(title, kDiscordEmbedTitleMax, "webhook embed title");
-        auto const descClamped =
-            clampUtf8ByBytes(description, kDiscordEmbedDescriptionMax, "webhook embed description");
-        auto const footerClamped =
-            clampUtf8ByBytes(footer, kDiscordEmbedFooterMax, "webhook embed footer");
+        GEODE_UNWRAP_INTO(
+            auto titleClamped,
+            truncateDiscordText(title, kDiscordEmbedTitleMax, "webhook embed title")
+        );
+        GEODE_UNWRAP_INTO(
+            auto descClamped,
+            truncateDiscordText(description, kDiscordEmbedDescriptionMax, "webhook embed description")
+        );
+        GEODE_UNWRAP_INTO(
+            auto footerClamped,
+            truncateDiscordText(footer, kDiscordEmbedFooterMax, "webhook embed footer")
+        );
 
         auto fieldsArr = matjson::Value::array();
         size_t const nFields = std::min(fields.size(), kDiscordEmbedFieldCountMax);
@@ -157,24 +173,30 @@ namespace webhook_impl {
         }
         for (size_t i = 0; i < nFields; ++i) {
             auto const& f = fields[i];
+            GEODE_UNWRAP_INTO(
+                auto name,
+                truncateDiscordText(f.name, kDiscordEmbedFieldNameMax, "webhook embed field name")
+            );
+            GEODE_UNWRAP_INTO(
+                auto value,
+                truncateDiscordText(f.value, kDiscordEmbedFieldValueMax, "webhook embed field value")
+            );
             auto obj = matjson::Value::object();
-            obj["name"] =
-                clampUtf8ByBytes(f.name, kDiscordEmbedFieldNameMax, "webhook embed field name");
-            obj["value"] =
-                clampUtf8ByBytes(f.value, kDiscordEmbedFieldValueMax, "webhook embed field value");
+            obj["name"] = std::move(name);
+            obj["value"] = std::move(value);
             obj["inline"] = f.inlineField;
             fieldsArr.push(obj);
         }
 
         auto embed = matjson::Value::object();
-        embed["title"] = titleClamped;
-        embed["description"] = descClamped;
+        embed["title"] = std::move(titleClamped);
+        embed["description"] = std::move(descClamped);
         embed["color"] = color;
         embed["fields"] = fieldsArr;
         embed["timestamp"] = currentIso8601Utc();
         if (!footerClamped.empty()) {
             auto footerObj = matjson::Value::object();
-            footerObj["text"] = footerClamped;
+            footerObj["text"] = std::move(footerClamped);
             embed["footer"] = footerObj;
         }
         if (embedScreenshotAttachment) {
@@ -190,12 +212,14 @@ namespace webhook_impl {
         auto username =
             geode::utils::string::trim(Mod::get()->getSettingValue<std::string>("webhook-username"));
         if (!username.empty()) {
-            payload["username"] = clampUtf8ByBytes(
-                std::move(username), kDiscordWebhookUsernameMax, "webhook username override"
+            GEODE_UNWRAP_INTO(
+                auto truncated,
+                truncateDiscordText(username, kDiscordWebhookUsernameMax, "webhook username override")
             );
+            payload["username"] = std::move(truncated);
         }
         payload["embeds"] = embedsArr;
-        return payload;
+        return Ok(std::move(payload));
     }
 
     std::optional<int> backoffSecondsForFailedAttempt(
@@ -330,18 +354,19 @@ namespace webhook_impl {
         if (urls.empty()) {
             return;
         }
-        auto maxRetries = static_cast<int>(Mod::get()->getSettingValue<int64_t>("max-retries"));
-        if (maxRetries < 0) {
-            maxRetries = 0;
+        bool const hasShot = message.screenshotPng.has_value() && !message.screenshotPng->empty();
+        auto payloadResult = buildWebhookPayload(
+            message.title, message.description, message.color, message.fields, message.footer, hasShot
+        );
+        if (payloadResult.isErr()) {
+            return;
         }
+        auto payload = std::move(payloadResult).unwrap();
+        int const maxRetries =
+            std::max(0, static_cast<int>(Mod::get()->getSettingValue<int64_t>("max-retries")));
         int const effectiveMaxRetries = useSync ? std::min(maxRetries, kSyncMaxRetries) : maxRetries;
 
-        bool const hasShot = message.screenshotPng.has_value() && !message.screenshotPng->empty();
-
         if (hasShot) {
-            auto payload = buildWebhookPayload(
-                message.title, message.description, message.color, message.fields, message.footer, true
-            );
             auto payloadJson = payload.dump(matjson::NO_INDENTATION);
             if (useSync) {
                 auto const& bytes = *message.screenshotPng;
@@ -362,9 +387,6 @@ namespace webhook_impl {
             return;
         }
 
-        auto payload = buildWebhookPayload(
-            message.title, message.description, message.color, message.fields, message.footer, false
-        );
         if (useSync) {
             for (auto const& url : urls) {
                 postWebhookSyncWithRetries(url, matjson::Value(payload), effectiveMaxRetries);
@@ -377,41 +399,37 @@ namespace webhook_impl {
         }
     }
 
-    matjson::Value buildContentWebhookPayload(std::string const& content) {
-        auto payload = matjson::Value::object();
-        auto username =
-            geode::utils::string::trim(Mod::get()->getSettingValue<std::string>("webhook-username"));
-        if (!username.empty()) {
-            payload["username"] = clampUtf8ByBytes(
-                std::move(username), kDiscordWebhookUsernameMax, "webhook username override"
-            );
-        }
-        payload["content"] = content;
-        return payload;
-    }
-
-    void sendContentImpl(std::string const& content) {
-        auto urls = collectWebhookTargets();
-        if (urls.empty()) {
-            return;
-        }
-        auto maxRetries = static_cast<int>(Mod::get()->getSettingValue<int64_t>("max-retries"));
-        if (maxRetries < 0) {
-            maxRetries = 0;
-        }
-        auto base = buildContentWebhookPayload(content);
-        for (auto const& url : urls) {
-            async::spawn(postWebhookWithRetries(url, matjson::Value(base), maxRetries));
-        }
-    }
-
 } // namespace webhook_impl
 
 void sendWebhookContent(std::string const& content) {
     constexpr size_t kMaxDiscordContent = 2000;
-    webhook_impl::sendContentImpl(
-        webhook_impl::clampUtf8ByBytes(content, kMaxDiscordContent, "webhook message content")
-    );
+    auto urls = webhook_impl::collectWebhookTargets();
+    if (urls.empty()) {
+        return;
+    }
+    auto contentResult =
+        webhook_impl::truncateDiscordText(content, kMaxDiscordContent, "webhook message content");
+    if (contentResult.isErr()) {
+        return;
+    }
+    auto payload = matjson::Value::object();
+    auto username =
+        geode::utils::string::trim(Mod::get()->getSettingValue<std::string>("webhook-username"));
+    if (!username.empty()) {
+        auto usernameResult = webhook_impl::truncateDiscordText(
+            username, webhook_impl::kDiscordWebhookUsernameMax, "webhook username override"
+        );
+        if (usernameResult.isErr()) {
+            return;
+        }
+        payload["username"] = std::move(usernameResult).unwrap();
+    }
+    payload["content"] = std::move(contentResult).unwrap();
+    int const maxRetries =
+        std::max(0, static_cast<int>(Mod::get()->getSettingValue<int64_t>("max-retries")));
+    for (auto const& url : urls) {
+        async::spawn(webhook_impl::postWebhookWithRetries(url, matjson::Value(payload), maxRetries));
+    }
 }
 
 void sendWebhook(WebhookMessage message) {

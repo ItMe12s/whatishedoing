@@ -2,12 +2,11 @@
 
 #include "play_policy.hpp"
 
+#include <Geode/utils/timer.hpp>
 #include <chrono>
 #include <cstdint>
 #include <iostream>
 #include <string>
-
-#include <Geode/utils/timer.hpp>
 
 using Clock = std::chrono::steady_clock;
 using Milliseconds = std::chrono::milliseconds;

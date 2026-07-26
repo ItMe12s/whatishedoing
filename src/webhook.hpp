@@ -24,5 +24,4 @@ void sendWebhook(WebhookMessage message);
 void sendWebhookIfEnabled(std::string const& settingKey, WebhookMessage message);
 void sendWebhookBlocking(WebhookMessage message);
 
-// Plain-message webhook (JSON content field only), all configured URLs and retries.
 void sendWebhookContent(std::string const& content);

@@ -113,14 +113,11 @@ namespace {
 
     void testLevelFilter() {
         auto const ids = level_filter::parseLevelIds("3 1,2,2 Stereo Madness,0");
-        expect(
-            level_filter::serializeLevelIds(ids) == "0,1,2,3",
-            "profile-compatible sorted ID serialization"
-        );
+        expect(ids == level_filter::LevelIds{0, 1, 2, 3}, "sorted unique level IDs");
         expect(level_filter::parseLevelIds("").empty(), "empty level ID list");
         expect(
-            level_filter::serializeLevelIds(level_filter::parseLevelIds("6\t5\n4\r3\f2\v1,0,6")) ==
-                "0,1,2,3,4,5,6",
+            level_filter::parseLevelIds("6\t5\n4\r3\f2\v1,0,6") ==
+                level_filter::LevelIds{0, 1, 2, 3, 4, 5, 6},
             "all C-locale separators and duplicates"
         );
         expect(level_filter::parseLevelIds("4x").contains(4), "legacy numeric prefix parsing");
@@ -171,32 +168,6 @@ namespace {
             text_policy::formatDurationMs(1000) == "1 second", "whole second milliseconds duration"
         );
 
-        std::string const utf8 =
-            "A\xC3\xA9"
-            "B";
-        expect(text_policy::clampUtf8ByBytes(utf8, 0).empty(), "UTF-8 zero-byte limit");
-        expect(text_policy::clampUtf8ByBytes("abc", 2) == "ab", "ASCII byte cut");
-        expect(text_policy::clampUtf8ByBytes(utf8, 4) == utf8, "UTF-8 unchanged at limit");
-        expect(
-            text_policy::clampUtf8ByBytes(utf8, 3) == "A\xC3\xA9", "UTF-8 exact code point boundary"
-        );
-        expect(text_policy::clampUtf8ByBytes(utf8, 2) == "A", "UTF-8 partial code point removed");
-        std::string const euro =
-            "A\xE2\x82\xAC"
-            "B";
-        expect(text_policy::clampUtf8ByBytes(euro, 2) == "A", "three-byte cut at byte 1");
-        expect(text_policy::clampUtf8ByBytes(euro, 3) == "A", "three-byte cut at byte 2");
-        expect(text_policy::clampUtf8ByBytes(euro, 4) == "A\xE2\x82\xAC", "three-byte exact boundary");
-        std::string const emoji =
-            "A\xF0\x9F\x98\x80"
-            "B";
-        expect(text_policy::clampUtf8ByBytes(emoji, 2) == "A", "four-byte cut at byte 1");
-        expect(text_policy::clampUtf8ByBytes(emoji, 3) == "A", "four-byte cut at byte 2");
-        expect(text_policy::clampUtf8ByBytes(emoji, 4) == "A", "four-byte cut at byte 3");
-        expect(
-            text_policy::clampUtf8ByBytes(emoji, 5) == "A\xF0\x9F\x98\x80",
-            "four-byte exact boundary"
-        );
         expect(play_policy::segmentMeetsThreshold(80, 100, 20), "startpos completion at threshold");
         expect(
             !play_policy::segmentMeetsThreshold(81, 100, 20), "startpos completion below threshold"
