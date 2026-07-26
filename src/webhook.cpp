@@ -5,13 +5,15 @@
 
 #include <Geode/Geode.hpp>
 #include <Geode/utils/async.hpp>
+#include <Geode/utils/ranges.hpp>
 #include <Geode/utils/string.hpp>
 #include <Geode/utils/web.hpp>
 #include <algorithm>
 #include <arc/time/Sleep.hpp>
+#include <array>
+#include <asp/time/SystemTime.hpp>
 #include <chrono>
 #include <cstdint>
-#include <ctime>
 #include <matjson.hpp>
 #include <memory>
 #include <optional>
@@ -46,12 +48,23 @@ namespace webhook_impl {
     }
 
     static bool isAllowedDiscordWebhookHost(std::string const& hostLower) {
-        return hostLower == "discord.com" || hostLower == "discordapp.com" ||
-            hostLower == "canary.discord.com" || hostLower == "ptb.discord.com";
+        static constexpr std::array<std::string_view, 4> kAllowedHosts = {
+            "discord.com",
+            "discordapp.com",
+            "canary.discord.com",
+            "ptb.discord.com",
+        };
+        return geode::utils::ranges::contains(kAllowedHosts, std::string_view(hostLower));
     }
 
-    static bool pathHasDiscordWebhookPrefix(std::string const& url) {
-        return geode::utils::string::contains(url, "/api/webhooks/");
+    static std::string_view safeWebErrorMessage(web::WebResponse const& res) {
+        auto const error = res.errorMessage();
+        if (error.empty() || geode::utils::string::contains(error, "://") ||
+            geode::utils::string::contains(error, "/api/webhooks/") ||
+            error.find_first_of("\r\n") != std::string_view::npos) {
+            return {};
+        }
+        return error;
     }
 
     // Returns nullopt if the URL is missing or not suitable for a Discord webhook POST.
@@ -63,7 +76,7 @@ namespace webhook_impl {
             log::warn("Webhook URL must start with https://");
             return std::nullopt;
         }
-        if (!pathHasDiscordWebhookPrefix(url)) {
+        if (!geode::utils::string::contains(url, "/api/webhooks/")) {
             log::warn("Webhook URL must include Discord path /api/webhooks/");
             return std::nullopt;
         }
@@ -94,17 +107,15 @@ namespace webhook_impl {
     }
 
     std::vector<std::string> collectWebhookTargets() {
-        static constexpr char const* kExtraKeys[] = {
+        static constexpr char const* kWebhookKeys[] = {
+            "webhook-url",
             "extra-webhook-url-1",
             "extra-webhook-url-2",
             "extra-webhook-url-3",
             "extra-webhook-url-4",
         };
         std::vector<std::string> out;
-        if (auto u = normalizeWebhookUrl(Mod::get()->getSettingValue<std::string>("webhook-url"))) {
-            out.push_back(std::move(*u));
-        }
-        for (auto* key : kExtraKeys) {
+        for (auto* key : kWebhookKeys) {
             if (auto u = normalizeWebhookUrl(Mod::get()->getSettingValue<std::string>(key))) {
                 out.push_back(std::move(*u));
             }
@@ -113,17 +124,16 @@ namespace webhook_impl {
     }
 
     std::string currentIso8601Utc() {
-        auto const now = std::chrono::system_clock::now();
-        auto const tt = std::chrono::system_clock::to_time_t(now);
-        std::tm utc{};
-#ifdef _WIN32
-        gmtime_s(&utc, &tt);
-#else
-        gmtime_r(&tt, &utc);
-#endif
-        char buf[32];
-        std::strftime(buf, sizeof(buf), "%Y-%m-%dT%H:%M:%SZ", &utc);
-        return buf;
+        auto const now = asp::SystemTime::now().dateTimeUtc();
+        return fmt::format(
+            "{:04}-{:02}-{:02}T{:02}:{:02}:{:02}Z",
+            now.date.year,
+            static_cast<int>(now.date.month),
+            static_cast<int>(now.date.day),
+            static_cast<int>(now.time.hours),
+            static_cast<int>(now.time.minutes),
+            static_cast<int>(now.time.seconds)
+        );
     }
 
     matjson::Value buildWebhookPayload(
@@ -201,13 +211,23 @@ namespace webhook_impl {
             maxDelaySeconds
         );
         if (!delay) {
-            log::warn("Webhook POST failed after {} attempts (status {})", attempt + 1, res.code());
+            auto const error = safeWebErrorMessage(res);
+            log::warn(
+                "Webhook POST failed after {} attempts (status {}){}{}",
+                attempt + 1,
+                res.code(),
+                error.empty() ? "" : ": ",
+                error
+            );
             return std::nullopt;
         }
         if (res.code() != 429) {
+            auto const error = safeWebErrorMessage(res);
             log::warn(
-                "Webhook POST failed (status {}), retrying in {}s ({}/{})",
+                "Webhook POST failed (status {}){}{}, retrying in {}s ({}/{})",
                 res.code(),
+                error.empty() ? "" : ": ",
+                error,
                 *delay,
                 attempt + 1,
                 maxRetries + 1
@@ -388,15 +408,10 @@ namespace webhook_impl {
 } // namespace webhook_impl
 
 void sendWebhookContent(std::string const& content) {
-    std::string body = content;
     constexpr size_t kMaxDiscordContent = 2000;
-    if (body.size() > kMaxDiscordContent) {
-        log::warn(
-            "Webhook message content truncated from {} to {} characters", body.size(), kMaxDiscordContent
-        );
-        body = text_policy::clampUtf8ByBytes(body, kMaxDiscordContent);
-    }
-    webhook_impl::sendContentImpl(body);
+    webhook_impl::sendContentImpl(
+        webhook_impl::clampUtf8ByBytes(content, kMaxDiscordContent, "webhook message content")
+    );
 }
 
 void sendWebhook(WebhookMessage message) {

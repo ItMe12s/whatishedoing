@@ -9,16 +9,11 @@ using namespace geode::prelude;
 
 namespace profile {
 
-    bool RenamePopup::init(
-        std::size_t idx, std::string current, std::function<void(std::string)> onAccept,
-        std::function<void()> onClosed
-    ) {
+    bool RenamePopup::init(std::string current, geode::Function<void(std::string)> onAccept) {
         if (!Popup::init(280.f, 130.f, "GJ_square01.png")) {
             return false;
         }
-        m_idx = idx;
         m_onAccept = std::move(onAccept);
-        m_onClosed = std::move(onClosed);
 
         this->setTitle("Rename Profile");
         this->setID("profile-rename-popup"_spr);
@@ -37,44 +32,35 @@ namespace profile {
 
         auto cancelSpr = ButtonSprite::create("Cancel", "goldFont.fnt", "GJ_button_06.png", .8f);
         cancelSpr->setScale(.7f);
-        auto cancelBtn =
-            CCMenuItemSpriteExtra::create(cancelSpr, this, menu_selector(RenamePopup::onClose));
+        auto cancelBtn = cocos::CCMenuItemExt::createSpriteExtra(cancelSpr, [this](auto*) {
+            this->Popup::onClose(nullptr);
+        });
         cancelBtn->setID("profile-rename-cancel"_spr);
         m_buttonMenu->addChildAtPosition(cancelBtn, Anchor::Bottom, ccp(-50.f, 30.f));
 
         auto saveSpr = ButtonSprite::create("Save", "goldFont.fnt", "GJ_button_01.png", .8f);
         saveSpr->setScale(.7f);
-        auto saveBtn =
-            CCMenuItemSpriteExtra::create(saveSpr, this, menu_selector(RenamePopup::onAccept));
+        auto saveBtn = cocos::CCMenuItemExt::createSpriteExtra(saveSpr, [this](auto*) {
+            this->onAccept();
+        });
         saveBtn->setID("profile-rename-apply"_spr);
         m_buttonMenu->addChildAtPosition(saveBtn, Anchor::Bottom, ccp(50.f, 30.f));
 
         return true;
     }
 
-    void RenamePopup::onAccept(cocos2d::CCObject*) {
+    void RenamePopup::onAccept() {
         if (!m_input) return;
         std::string const value = m_input->getString();
         if (m_onAccept) {
             m_onAccept(value);
         }
-        this->onClose(nullptr);
+        this->Popup::onClose(nullptr);
     }
 
-    void RenamePopup::onClose(cocos2d::CCObject* sender) {
-        if (m_onClosed) {
-            m_onClosed();
-            m_onClosed = nullptr;
-        }
-        Popup::onClose(sender);
-    }
-
-    RenamePopup* RenamePopup::create(
-        std::size_t idx, std::string current, std::function<void(std::string)> onAccept,
-        std::function<void()> onClosed
-    ) {
+    RenamePopup* RenamePopup::create(std::string current, geode::Function<void(std::string)> onAccept) {
         auto* ret = new RenamePopup();
-        if (ret->init(idx, std::move(current), std::move(onAccept), std::move(onClosed))) {
+        if (ret->init(std::move(current), std::move(onAccept))) {
             ret->autorelease();
             return ret;
         }

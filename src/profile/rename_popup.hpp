@@ -1,8 +1,7 @@
 #pragma once
 
 #include <Geode/ui/Popup.hpp>
-#include <cstddef>
-#include <functional>
+#include <Geode/utils/function.hpp>
 #include <string>
 
 namespace geode {
@@ -13,24 +12,15 @@ namespace profile {
 
     class RenamePopup : public geode::Popup {
     protected:
-        std::size_t m_idx = 0;
         geode::TextInput* m_input = nullptr;
-        std::function<void(std::string)> m_onAccept;
-        std::function<void()> m_onClosed;
+        geode::Function<void(std::string)> m_onAccept;
 
-        bool init(
-            std::size_t idx, std::string current, std::function<void(std::string)> onAccept,
-            std::function<void()> onClosed
-        );
+        bool init(std::string current, geode::Function<void(std::string)> onAccept);
 
-        void onAccept(cocos2d::CCObject* sender);
-        void onClose(cocos2d::CCObject* sender) override;
+        void onAccept();
 
     public:
-        static RenamePopup* create(
-            std::size_t idx, std::string current, std::function<void(std::string)> onAccept,
-            std::function<void()> onClosed = {}
-        );
+        static RenamePopup* create(std::string current, geode::Function<void(std::string)> onAccept);
     };
 
 } // namespace profile

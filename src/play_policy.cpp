@@ -3,10 +3,7 @@
 #include <algorithm>
 
 RunMode deriveRunMode(bool practice, bool startpos) noexcept {
-    if (practice) {
-        return RunMode::Practice;
-    }
-    return startpos ? RunMode::Startpos : RunMode::Normal;
+    return practice ? RunMode::Practice : startpos ? RunMode::Startpos : RunMode::Normal;
 }
 
 namespace play_policy {
@@ -16,8 +13,7 @@ namespace play_policy {
     }
 
     bool segmentMeetsThreshold(int startPercent, int endPercent, int minimumProgress) noexcept {
-        int const progress = endPercent - startPercent;
-        return progress >= 0 && progress >= minimumProgress;
+        return endPercent - startPercent >= std::max(0, minimumProgress);
     }
 
     bool shouldNotifyDeath(DeathPolicy const& p) noexcept {
@@ -35,10 +31,9 @@ namespace play_policy {
     }
 
     int effectiveBest(int storedBest, int percentAtDeath, int bestBeforeDeath) noexcept {
-        if (bestBeforeDeath >= 0 && percentAtDeath > bestBeforeDeath) {
-            return std::max(storedBest, percentAtDeath);
-        }
-        return storedBest;
+        return bestBeforeDeath >= 0 && percentAtDeath > bestBeforeDeath ?
+            std::max(storedBest, percentAtDeath) :
+            storedBest;
     }
 
     std::optional<int> newBestToNotify(NewBestPolicy const& p) noexcept {

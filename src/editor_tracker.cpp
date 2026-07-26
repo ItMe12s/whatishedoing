@@ -28,7 +28,9 @@ namespace {
             return;
         }
         auto const playerName = getPlayerName();
-        auto const elapsed = text_policy::formatDuration(secondsSince(session.startTime));
+        auto const elapsed = text_policy::formatDuration(
+            static_cast<int>(session.timer.elapsed<std::chrono::seconds>())
+        );
         std::vector<WebhookField> fields = {
             {"Level", display.levelName, true},
             {"Creator", display.creatorName, true},
@@ -41,7 +43,7 @@ namespace {
             WebhookMessage{
                 .title = actionTitle,
                 .description = fmt::format("{} left the editor.", playerName),
-                .color = embed_color::editorExit(),
+                .color = embed_color::fromKey("color-editor-exit"),
                 .fields = std::move(fields),
                 .footer = elapsed,
             }
@@ -61,7 +63,7 @@ class $modify(WebhookLevelEditorLayer, LevelEditorLayer) {
         }
         levelSession().reset();
         auto& session = editorSession();
-        session.startTime = Clock::now();
+        session.timer.reset();
         auto const levelID = EditorIDs::getID(level);
         auto const nameRaw = std::string(level->m_levelName);
         auto const creatorRaw = std::string(level->m_creatorName);
@@ -91,7 +93,7 @@ class $modify(WebhookLevelEditorLayer, LevelEditorLayer) {
                     display.levelName,
                     display.creatorName
                 ),
-                .color = embed_color::editorOpen(),
+                .color = embed_color::fromKey("color-editor-open"),
                 .fields = std::move(fields),
             }
         );

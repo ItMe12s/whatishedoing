@@ -1,32 +1,33 @@
 #include "level_filter.hpp"
 
-#include <cctype>
+#include <algorithm>
 #include <charconv>
+#include <locale>
+#include <sstream>
+#include <utility>
 
 namespace level_filter {
 
     LevelIds parseLevelIds(std::string_view raw) {
+        std::string normalized(raw);
+        auto const& locale = std::locale::classic();
+        std::ranges::replace_if(
+            normalized,
+            [&locale](char c) {
+                return c == ',' || std::isspace(c, locale);
+            },
+            ' '
+        );
+
         LevelIds ids;
-        std::size_t start = 0;
-        while (start < raw.size()) {
-            while (start < raw.size() &&
-                   (raw[start] == ',' || std::isspace(static_cast<unsigned char>(raw[start])))) {
-                ++start;
-            }
-            if (start == raw.size()) {
-                break;
-            }
-            std::size_t end = start;
-            while (end < raw.size() && raw[end] != ',' &&
-                   !std::isspace(static_cast<unsigned char>(raw[end]))) {
-                ++end;
-            }
+        std::istringstream input(std::move(normalized));
+        input.imbue(locale);
+        for (std::string token; input >> token;) {
             int id = 0;
-            auto const result = std::from_chars(raw.data() + start, raw.data() + end, id);
+            auto const result = std::from_chars(token.data(), token.data() + token.size(), id);
             if (result.ec == std::errc{}) {
                 ids.insert(id);
             }
-            start = end;
         }
         return ids;
     }
@@ -43,13 +44,9 @@ namespace level_filter {
     }
 
     Mode parseMode(std::string_view raw) noexcept {
-        if (raw == "Blacklist") {
-            return Mode::Blacklist;
-        }
-        if (raw == "Whitelist") {
-            return Mode::Whitelist;
-        }
-        return Mode::All;
+        return raw == "Blacklist" ? Mode::Blacklist :
+            raw == "Whitelist"    ? Mode::Whitelist :
+                                    Mode::All;
     }
 
     bool shouldRedact(int levelId, Mode mode, LevelIds const& ids) noexcept {

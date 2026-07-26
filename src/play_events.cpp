@@ -45,7 +45,7 @@ namespace play_events {
     bool matchesLevelSession(int levelID, std::string const& levelName, Clock::time_point attemptStart) {
         auto const& session = levelSession();
         return session.active && session.levelID == levelID && session.levelName == levelName &&
-            session.attemptStart == attemptStart;
+            session.attemptTimer.time() == attemptStart;
     }
 
     void queueStartposSegmentStart(PlayLayer* layer) {
@@ -57,23 +57,25 @@ namespace play_events {
         }
         auto const levelID = EditorIDs::getID(layer->m_level);
         std::string const levelName = std::string(layer->m_level->m_levelName);
-        auto const attemptStart = levelSession().attemptStart;
+        auto const attemptStart = levelSession().attemptTimer.time();
         int const startPercent = static_cast<int>(layer->getCurrentPercent());
-        geode::queueInMainThread([layer, levelID, levelName, attemptStart, startPercent] {
-            auto* activeLayer = PlayLayer::get();
-            if (activeLayer != layer || !activeLayer->m_level) {
-                return;
+        geode::queueInMainThread(
+            [layer = WeakRef(layer), levelID, levelName, attemptStart, startPercent] {
+                auto activeLayer = layer.lock();
+                if (!activeLayer || PlayLayer::get() != activeLayer.data() || !activeLayer->m_level) {
+                    return;
+                }
+                if (!play_policy::shouldCaptureStartposSegment(
+                        deriveRunMode(activeLayer->m_isPracticeMode, activeLayer->m_isTestMode)
+                    )) {
+                    return;
+                }
+                if (!matchesLevelSession(levelID, levelName, attemptStart)) {
+                    return;
+                }
+                levelSession().startPercent = startPercent;
             }
-            if (!play_policy::shouldCaptureStartposSegment(
-                    deriveRunMode(activeLayer->m_isPracticeMode, activeLayer->m_isTestMode)
-                )) {
-                return;
-            }
-            if (!matchesLevelSession(levelID, levelName, attemptStart)) {
-                return;
-            }
-            levelSession().startPercent = startPercent;
-        });
+        );
     }
 
     void reopenLevelSessionIfNeeded(PlayLayer* layer) {
@@ -86,7 +88,7 @@ namespace play_events {
         session.levelName = std::string(level->m_levelName);
         session.creatorName = displayCreatorName(std::string(level->m_creatorName));
         session.accumulated = Milliseconds::zero();
-        session.attemptStart = Clock::now();
+        session.attemptTimer.reset();
         session.active = true;
         session.startPercent = static_cast<int>(level->m_normalPercent.value());
         session.bestNotifiedPercent = static_cast<int>(level->m_newNormalPercent2.value());
@@ -97,7 +99,7 @@ namespace play_events {
     }
 
     void sendDeathWebhookIfNeeded(
-        PlayLayer* layer, int currentPercent, int bestBefore, std::function<bool()> captureStillValid
+        PlayLayer* layer, int currentPercent, int bestBefore, geode::Function<bool()> captureStillValid
     ) {
         auto& session = levelSession();
         if (!layer || !layer->m_level) {
@@ -138,7 +140,7 @@ namespace play_events {
         int const deathStartPercent = session.startPercent;
         int const sessionLevelID = session.levelID;
         std::string const sessionLevelName = session.levelName;
-        auto const sessionAttemptStart = session.attemptStart;
+        auto const sessionAttemptStart = session.attemptTimer.time();
         session.deathNotified = true;
         auto sendDeath = [=](std::optional<std::vector<std::uint8_t>> screenshot) {
             if (fromStartpos) {
@@ -153,7 +155,7 @@ namespace play_events {
                             display.levelName,
                             display.creatorName
                         ),
-                        .color = embed_color::death(),
+                        .color = embed_color::fromKey("color-death"),
                         .fields =
                             {
                                 {"Level", display.levelName, true},
@@ -175,7 +177,7 @@ namespace play_events {
                             display.levelName,
                             display.creatorName
                         ),
-                        .color = embed_color::death(),
+                        .color = embed_color::fromKey("color-death"),
                         .fields =
                             {
                                 {"Level", display.levelName, true},
@@ -193,7 +195,10 @@ namespace play_events {
         }
         capturePlayLayerScreenshotAfterDelay(
             layer,
-            [=] {
+            [captureStillValid = std::move(captureStillValid),
+             sessionLevelID,
+             sessionLevelName,
+             sessionAttemptStart]() mutable {
                 return captureStillValid() &&
                     matchesLevelSession(sessionLevelID, sessionLevelName, sessionAttemptStart);
             },
@@ -203,7 +208,7 @@ namespace play_events {
 
     void sendNewBestWebhookIfNeeded(
         PlayLayer* layer, int percentAtDeath, int bestBeforeDeath,
-        std::function<bool()> captureStillValid
+        geode::Function<bool()> captureStillValid
     ) {
         if (!layer || !layer->m_level) {
             return;
@@ -241,7 +246,7 @@ namespace play_events {
         session.bestNotifiedPercent = effectiveBest;
         int const sessionLevelID = session.levelID;
         std::string const sessionLevelName = session.levelName;
-        auto const sessionAttemptStart = session.attemptStart;
+        auto const sessionAttemptStart = session.attemptTimer.time();
         auto sendNewBest = [=](std::optional<std::vector<std::uint8_t>> screenshot) {
             sendWebhook(
                 WebhookMessage{
@@ -253,7 +258,7 @@ namespace play_events {
                         display.levelName,
                         display.creatorName
                     ),
-                    .color = embed_color::newBest(),
+                    .color = embed_color::fromKey("color-new-best"),
                     .fields =
                         {
                             {"Level", display.levelName, true},
@@ -270,7 +275,10 @@ namespace play_events {
         }
         capturePlayLayerScreenshotAfterDelay(
             layer,
-            [=] {
+            [captureStillValid = std::move(captureStillValid),
+             sessionLevelID,
+             sessionLevelName,
+             sessionAttemptStart]() mutable {
                 return captureStillValid() &&
                     matchesLevelSession(sessionLevelID, sessionLevelName, sessionAttemptStart);
             },
@@ -296,7 +304,7 @@ namespace play_events {
             session.creatorName,
             session.mode,
             elapsedMilliseconds,
-            session.attemptStart,
+            session.attemptTimer.time(),
         };
     }
 
@@ -320,8 +328,9 @@ namespace play_events {
             WebhookMessage{
                 .title = pending.mode == RunMode::Practice ? "Exited a Practice Run" : "Exited a Level",
                 .description = fmt::format("{} exited **{}**.", playerName, display.levelName),
-                .color = pending.mode == RunMode::Practice ? embed_color::playPractice() :
-                                                             embed_color::levelExit(),
+                .color = pending.mode == RunMode::Practice ?
+                    embed_color::fromKey("color-play-practice") :
+                    embed_color::fromKey("color-level-exit"),
                 .fields =
                     {
                         {"Level", display.levelName, true},

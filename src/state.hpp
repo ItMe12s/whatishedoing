@@ -4,7 +4,10 @@
 
 #include <chrono>
 #include <cstdint>
+#include <iostream>
 #include <string>
+
+#include <Geode/utils/timer.hpp>
 
 using Clock = std::chrono::steady_clock;
 using Milliseconds = std::chrono::milliseconds;
@@ -12,12 +15,12 @@ using Milliseconds = std::chrono::milliseconds;
 inline constexpr int kLevelSessionClearedId = -67;
 
 struct GameSession {
-    Clock::time_point startTime;
+    geode::utils::Timer<Clock> timer;
     bool started = false;
 };
 
 struct LevelSession {
-    Clock::time_point attemptStart;
+    geode::utils::Timer<Clock> attemptTimer;
     Milliseconds accumulated{};
     int levelID = kLevelSessionClearedId;
     std::string levelName;
@@ -37,7 +40,7 @@ struct LevelSession {
 };
 
 struct EditorSession {
-    Clock::time_point startTime;
+    geode::utils::Timer<Clock> timer;
     int levelID = kLevelSessionClearedId;
     std::string levelName;
     std::string creatorName;
@@ -53,7 +56,6 @@ EditorSession& editorSession();
 std::string getPlayerName();
 std::string displayLevelName(std::string const& levelName);
 std::string displayCreatorName(std::string const& creatorName);
-int secondsSince(Clock::time_point const& start);
 
 struct LevelDisplay {
     std::string levelName;

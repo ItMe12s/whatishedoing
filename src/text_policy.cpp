@@ -9,12 +9,8 @@
 namespace text_policy {
 
     std::string clampUtf8ByBytes(std::string_view text, std::size_t maxBytes) {
-        if (text.size() <= maxBytes) {
-            return std::string(text);
-        }
-        std::size_t end = maxBytes;
-        while (end > 0 && end < text.size() &&
-               (static_cast<unsigned char>(text[end]) & 0xc0) == 0x80) {
+        auto end = std::min(text.size(), maxBytes);
+        while (end && end < text.size() && (static_cast<unsigned char>(text[end]) & 0xc0) == 0x80) {
             --end;
         }
         return std::string(text.substr(0, end));

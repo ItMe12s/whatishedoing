@@ -6,6 +6,7 @@
 #include <Geode/binding/GJGameLevel.hpp>
 #include <Geode/utils/general.hpp>
 #include <Geode/utils/string.hpp>
+#include <array>
 
 using namespace geode::prelude;
 
@@ -13,15 +14,8 @@ namespace level_upload {
     namespace {
 
         std::string lengthString(int len) {
-            switch (len) {
-                case 0: return "Tiny";
-                case 1: return "Short";
-                case 2: return "Medium";
-                case 3: return "Long";
-                case 4: return "XL";
-                case 5: return "Plat";
-                default: return "Unknown";
-            }
+            static constexpr std::array kLengths = {"Tiny", "Short", "Medium", "Long", "XL", "Plat"};
+            return len >= 0 && len < static_cast<int>(kLengths.size()) ? kLengths[len] : "Unknown";
         }
 
         std::string processConditionals(std::string text, bool isUpdate) {
@@ -60,16 +54,15 @@ namespace level_upload {
 
         if (mod->getSettingValue<bool>("upload-use-custom-text")) {
             text = readCustomTextFile();
-            auto replace = [&](std::string_view from, std::string_view to) {
-                geode::utils::string::replaceIP(text, from, to);
-            };
-            replace("{creator}", creator);
-            replace("{name}", name);
-            replace("{id}", id);
-            replace("{lengh}", length);
-            replace("{length}", length);
-            replace("{objects}", objects);
-            replace("{role}", wantRolePing ? fmt::format("<@&{}>", roleID) : "");
+            geode::utils::string::replaceIP(text, "{creator}", creator);
+            geode::utils::string::replaceIP(text, "{name}", name);
+            geode::utils::string::replaceIP(text, "{id}", id);
+            geode::utils::string::replaceIP(text, "{lengh}", length);
+            geode::utils::string::replaceIP(text, "{length}", length);
+            geode::utils::string::replaceIP(text, "{objects}", objects);
+            geode::utils::string::replaceIP(
+                text, "{role}", wantRolePing ? fmt::format("<@&{}>", roleID) : ""
+            );
             text = processConditionals(text, isUpdate);
         }
         else {

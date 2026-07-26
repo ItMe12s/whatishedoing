@@ -26,11 +26,9 @@ namespace {
 
     std::atomic<std::uint64_t> g_encodeTmpSeq{0};
 
-    std::string uniqueEncodeTmpPath() {
+    std::filesystem::path uniqueEncodeTmpPath() {
         auto const n = g_encodeTmpSeq.fetch_add(1, std::memory_order_relaxed);
-        return geode::utils::string::pathToString(
-            Mod::get()->getSaveDir() / fmt::format("whatishedoing_cap_{}.png", n)
-        );
+        return Mod::get()->getTempDir() / fmt::format("whatishedoing_cap_{}.png", n);
     }
 
     double lanczos2(double x) {
@@ -125,9 +123,9 @@ namespace {
         return out;
     }
 
-    std::optional<std::vector<std::uint8_t>> encodeRgbaToPngBytes(
+    ScreenshotPng encodeRgbaToPngBytes(
         std::vector<std::uint8_t> flippedRgba, int pixelWidth, int pixelHeight, int pct,
-        std::string const& tmpStr
+        std::filesystem::path const& tmp
     ) {
         if (pixelWidth <= 0 || pixelHeight <= 0 || flippedRgba.empty()) {
             return std::nullopt;
@@ -159,15 +157,17 @@ namespace {
         image.m_bPreMulti = false;
         image.m_pData = encodePixels;
 
-        bool const saved = image.saveToFile(tmpStr.c_str(), true);
+        auto const tmpString = geode::utils::string::pathToString(tmp);
+        bool const saved = image.saveToFile(tmpString.c_str(), true);
         image.m_pData = nullptr;
+        std::error_code ec;
         if (!saved) {
+            std::filesystem::remove(tmp, ec);
             return std::nullopt;
         }
 
-        auto readResult = geode::utils::file::readBinary(tmpStr);
-        std::error_code ec;
-        std::filesystem::remove(std::filesystem::path(tmpStr), ec);
+        auto readResult = geode::utils::file::readBinary(tmp);
+        std::filesystem::remove(tmp, ec);
         if (!readResult.isOk()) {
             return std::nullopt;
         }
@@ -263,19 +263,15 @@ std::optional<CapturedScreenshotRgba> capturePlayLayerScreenshotRgba(PlayLayer* 
 }
 
 void spawnScreenshotEncodeToPngThen(
-    CapturedScreenshotRgba captured, int scalePct,
-    std::function<void(std::optional<std::vector<std::uint8_t>> png)> onMainThread
+    CapturedScreenshotRgba captured, int scalePct, ScreenshotCallback onMainThread
 ) {
-    std::string const tmp = uniqueEncodeTmpPath();
-    geode::async::runtime().spawnBlocking<void>(
-        [cap = std::move(captured), scalePct, tmp, cb = std::move(onMainThread)]() mutable {
-            auto png =
-                encodeRgbaToPngBytes(std::move(cap.rgba), cap.width, cap.height, scalePct, tmp);
-            geode::queueInMainThread([cb = std::move(cb), png = std::move(png)]() mutable {
-                cb(std::move(png));
-            });
+    auto const tmp = uniqueEncodeTmpPath();
+    auto task = geode::async::runtime().spawnBlocking<ScreenshotPng>(
+        [cap = std::move(captured), scalePct, tmp]() mutable {
+            return encodeRgbaToPngBytes(std::move(cap.rgba), cap.width, cap.height, scalePct, tmp);
         }
     );
+    geode::async::spawn(std::move(task), std::move(onMainThread));
 }
 
 namespace {
@@ -290,10 +286,8 @@ namespace {
         );
     }
 
-    using ScreenshotCallback = std::function<void(std::optional<std::vector<std::uint8_t>>)>;
-
     void captureScreenshotThen(
-        PlayLayer* layer, std::function<bool()> const& isStillValid, ScreenshotCallback callback
+        PlayLayer* layer, geode::FunctionRef<bool()> isStillValid, ScreenshotCallback callback
     ) {
         if (!layer || PlayLayer::get() != layer || !isStillValid()) {
             callback(std::nullopt);
@@ -310,16 +304,18 @@ namespace {
     }
 
     struct PendingScreenshotCapture {
-        PlayLayer* layer;
-        std::function<bool()> isStillValid;
+        WeakRef<PlayLayer> layer;
+        ScreenshotValidity isStillValid;
         ScreenshotCallback callback;
 
         PendingScreenshotCapture(
-            PlayLayer* layer, std::function<bool()> isStillValid, ScreenshotCallback callback
-        ) : layer(layer), isStillValid(std::move(isStillValid)), callback(std::move(callback)) {}
+            PlayLayer* playLayer, ScreenshotValidity validity, ScreenshotCallback onMainThread
+        ) :
+            layer(playLayer), isStillValid(std::move(validity)), callback(std::move(onMainThread)) {}
 
         void capture() {
-            captureScreenshotThen(layer, isStillValid, std::move(callback));
+            auto locked = layer.lock();
+            captureScreenshotThen(locked.data(), isStillValid, std::move(callback));
         }
 
         ~PendingScreenshotCapture() {
@@ -332,7 +328,7 @@ namespace {
 } // namespace
 
 void capturePlayLayerScreenshotAfterDelay(
-    PlayLayer* playLayer, std::function<bool()> isStillValid, ScreenshotCallback onMainThread
+    PlayLayer* playLayer, ScreenshotValidity isStillValid, ScreenshotCallback onMainThread
 ) {
     float const delay = screenshotDelaySeconds();
     if (delay <= 0.f) {

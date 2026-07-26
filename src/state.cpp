@@ -15,58 +15,33 @@ namespace {
 } // namespace
 
 int64_t LevelSession::elapsedMilliseconds() const {
-    auto total = accumulated;
-    if (active) {
-        total += std::chrono::duration_cast<Milliseconds>(Clock::now() - attemptStart);
-    }
-    return total.count();
+    return accumulated.count() + (active ? attemptTimer.elapsed<Milliseconds>() : 0);
 }
 
 std::string LevelSession::startTitle() const {
-    if (mode == RunMode::Practice) {
-        return "Playing a Level (Practice)";
-    }
-    return "Playing a Level";
+    return mode == RunMode::Practice ? "Playing a Level (Practice)" : "Playing a Level";
 }
 
 std::string LevelSession::exitTitle() const {
-    if (mode == RunMode::Practice) {
-        return "Exited a Practice Run";
-    }
-    return "Exited a Level";
+    return mode == RunMode::Practice ? "Exited a Practice Run" : "Exited a Level";
 }
 
 std::string LevelSession::completeTitle() const {
-    if (mode == RunMode::Practice) {
-        return "Practice Run Complete!";
-    }
-    return "Level Complete!";
+    return mode == RunMode::Practice ? "Practice Run Complete!" : "Level Complete!";
 }
 
 int LevelSession::color() const {
-    if (mode == RunMode::Practice) {
-        return embed_color::playPractice();
-    }
-    return embed_color::playNormal();
+    return embed_color::fromKey(
+        mode == RunMode::Practice ? "color-play-practice" : "color-play-normal"
+    );
 }
 
 void LevelSession::reset() {
-    accumulated = Milliseconds::zero();
-    levelID = kLevelSessionClearedId;
-    levelName.clear();
-    creatorName.clear();
-    active = false;
-    mode = RunMode::Normal;
-    startPercent = 0;
-    bestNotifiedPercent = 0;
-    deathNotified = false;
+    *this = {};
 }
 
 void EditorSession::reset() {
-    active = false;
-    levelID = kLevelSessionClearedId;
-    levelName.clear();
-    creatorName.clear();
+    *this = {};
 }
 
 GameSession& gameSession() {
@@ -92,12 +67,6 @@ std::string displayLevelName(std::string const& levelName) {
 
 std::string displayCreatorName(std::string const& creatorName) {
     return creatorName.empty() ? "Unknown" : creatorName;
-}
-
-int secondsSince(Clock::time_point const& start) {
-    return static_cast<int>(
-        std::chrono::duration_cast<std::chrono::seconds>(Clock::now() - start).count()
-    );
 }
 
 namespace {

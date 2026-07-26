@@ -27,7 +27,8 @@ class $modify(WebhookUploadPopup, UploadPopup) {
                 WebhookMessage{
                     .title = isUpdate ? "Level Updated" : "New Level Uploaded",
                     .description = std::move(content),
-                    .color = isUpdate ? embed_color::editorExit() : embed_color::editorOpen(),
+                    .color = isUpdate ? embed_color::fromKey("color-editor-exit") :
+                                        embed_color::fromKey("color-editor-open"),
                 }
             );
         }

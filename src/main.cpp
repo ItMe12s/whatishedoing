@@ -19,14 +19,14 @@ $execute {
                 return;
             }
             session.started = true;
-            session.startTime = Clock::now();
+            session.timer.reset();
             auto const playerName = getPlayerName();
             sendWebhookIfEnabled(
                 "notify-game-session",
                 WebhookMessage{
                     .title = "Opened Geometry Dash",
                     .description = fmt::format("{} opened Geometry Dash!", playerName),
-                    .color = embed_color::gameOpen(),
+                    .color = embed_color::fromKey("color-game-open"),
                 }
             );
         })
@@ -42,13 +42,15 @@ $execute {
                 return;
             }
             auto const playerName = getPlayerName();
-            auto const elapsed = text_policy::formatDuration(secondsSince(session.startTime));
+            auto const elapsed = text_policy::formatDuration(
+                static_cast<int>(session.timer.elapsed<std::chrono::seconds>())
+            );
             if (Mod::get()->getSettingValue<bool>("blocking-webhook")) {
                 sendWebhookBlocking(
                     WebhookMessage{
                         .title = "Closed Geometry Dash",
                         .description = fmt::format("{} closed Geometry Dash.", playerName),
-                        .color = embed_color::gameClose(),
+                        .color = embed_color::fromKey("color-game-close"),
                         .footer = elapsed,
                     }
                 );
@@ -58,7 +60,7 @@ $execute {
                     WebhookMessage{
                         .title = "Closed Geometry Dash",
                         .description = fmt::format("{} closed Geometry Dash.", playerName),
-                        .color = embed_color::gameClose(),
+                        .color = embed_color::fromKey("color-game-close"),
                         .footer = elapsed,
                     }
                 );
@@ -84,7 +86,7 @@ $on_mod(Loaded) {
             if (!Mod::get()->getSettingValue<bool>("upload-use-custom-text")) {
                 return;
             }
-            level_upload::openCustomTextFileFromSettings();
+            level_upload::revealCustomTextFileFromSettings();
         })
         .leak();
 
@@ -97,7 +99,7 @@ $on_mod(Loaded) {
             WebhookMessage{
                 .title = "Test Webhook",
                 .description = fmt::format("{} is testing the webhook!", playerName),
-                .color = embed_color::testWebhook(),
+                .color = embed_color::fromKey("color-test-webhook"),
             }
         );
         Mod::get()->setSettingValue<bool>("test-webhook", false);

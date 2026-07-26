@@ -1,8 +1,8 @@
 #include "data.hpp"
 
 #include <Geode/Geode.hpp>
+#include <Geode/utils/ranges.hpp>
 #include <Geode/utils/string.hpp>
-#include <algorithm>
 #include <cstdint>
 
 using namespace geode::prelude;
@@ -97,34 +97,15 @@ namespace profile {
         }
 
         void storeNames(std::array<std::string, kSlotCount> const& names) {
-            auto arr = matjson::Value::array();
-            for (auto const& n : names) {
-                arr.push(n);
-            }
-            Mod::get()->setSavedValue<matjson::Value>(kProfileNamesKey, arr);
+            Mod::get()->setSavedValue(kProfileNamesKey, names);
         }
 
         matjson::Value snapshotCurrentSettings() {
             auto out = matjson::Value::object();
             for (auto const& t : kTracked) {
-                switch (t.kind) {
-                    case Kind::Bool: out[t.key] = Mod::get()->getSettingValue<bool>(t.key); break;
-                    case Kind::Int: out[t.key] = Mod::get()->getSettingValue<int64_t>(t.key); break;
-                    case Kind::Float:
-                        out[t.key] = Mod::get()->getSettingValue<double>(t.key);
-                        break;
-                    case Kind::String:
-                        out[t.key] = Mod::get()->getSettingValue<std::string>(t.key);
-                        break;
-                    case Kind::Color: {
-                        auto c = Mod::get()->getSettingValue<cocos2d::ccColor3B>(t.key);
-                        auto obj = matjson::Value::object();
-                        obj["r"] = static_cast<int64_t>(c.r);
-                        obj["g"] = static_cast<int64_t>(c.g);
-                        obj["b"] = static_cast<int64_t>(c.b);
-                        out[t.key] = obj;
-                        break;
-                    }
+                matjson::Value value;
+                if (auto setting = Mod::get()->getSetting(t.key); setting && setting->save(value)) {
+                    out[t.key] = std::move(value);
                 }
             }
             return out;
@@ -167,18 +148,10 @@ namespace profile {
                         break;
                     }
                     case Kind::Color: {
-                        if (!v.isObject()) break;
-                        if (!v.contains("r") || !v.contains("g") || !v.contains("b")) break;
-                        auto rr = v["r"].asInt();
-                        auto gg = v["g"].asInt();
-                        auto bb = v["b"].asInt();
-                        if (!rr.isOk() || !gg.isOk() || !bb.isOk()) break;
-                        cocos2d::ccColor3B c{
-                            static_cast<GLubyte>(rr.unwrap()),
-                            static_cast<GLubyte>(gg.unwrap()),
-                            static_cast<GLubyte>(bb.unwrap()),
-                        };
-                        Mod::get()->setSettingValue<cocos2d::ccColor3B>(t.key, c);
+                        auto r = matjson::Serialize<cocos2d::ccColor3B>::fromJson(v);
+                        if (r.isOk()) {
+                            Mod::get()->setSettingValue<cocos2d::ccColor3B>(t.key, r.unwrap());
+                        }
                         break;
                     }
                 }
@@ -241,11 +214,8 @@ namespace profile {
         if (trimmed == old) {
             return Ok();
         }
-        for (std::size_t i = 0; i < kSlotCount; ++i) {
-            if (i == idx) continue;
-            if (names[i] == trimmed) {
-                return Err("Another slot is already named '{}'", trimmed);
-            }
+        if (geode::utils::ranges::contains(names, trimmed)) {
+            return Err("Another slot is already named '{}'", trimmed);
         }
 
         auto all = loadAll();

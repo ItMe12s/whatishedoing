@@ -13,10 +13,10 @@ namespace profile {
         cocos2d::CCNode* makeSlotRow(std::size_t idx, float width);
         void refreshRow(cocos2d::CCNode* row, std::size_t idx);
 
-        void onSaveSlot(cocos2d::CCObject* sender);
-        void onLoadSlot(cocos2d::CCObject* sender);
-        void onClearSlot(cocos2d::CCObject* sender);
-        void onRenameSlot(cocos2d::CCObject* sender);
+        void onSaveSlot(std::size_t idx);
+        void onLoadSlot(std::size_t idx);
+        void onClearSlot(std::size_t idx);
+        void onRenameSlot(std::size_t idx);
 
     public:
         static ProfileManagerPopup* create();

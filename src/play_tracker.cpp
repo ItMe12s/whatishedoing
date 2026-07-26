@@ -133,14 +133,13 @@ class $modify(WebhookPlayLayer, PlayLayer) {
         auto const creatorName = std::string(level->m_creatorName);
         auto const creatorDisplayName = displayCreatorName(creatorName);
         if (isContinuation) {
-            session.accumulated +=
-                std::chrono::duration_cast<Milliseconds>(Clock::now() - session.attemptStart);
+            session.accumulated += Milliseconds(session.attemptTimer.elapsed<Milliseconds>());
         }
         else {
             session.accumulated = Milliseconds::zero();
             session.levelID = levelID;
         }
-        session.attemptStart = Clock::now();
+        session.attemptTimer.reset();
         session.levelName = levelName;
         session.creatorName = creatorDisplayName;
         session.active = true;
@@ -227,13 +226,14 @@ class $modify(WebhookPlayLayer, PlayLayer) {
         );
         auto const playerName = getPlayerName();
         RunMode const completeModeSnapshot = pre.mode;
-        auto const completeColor =
-            completeModeSnapshot == RunMode::Practice ? pre.color() : embed_color::levelComplete();
+        auto const completeColor = completeModeSnapshot == RunMode::Practice ?
+            pre.color() :
+            embed_color::fromKey("color-level-complete");
         bool const fromStartpos = completeModeSnapshot == RunMode::Startpos;
         int const completeStartPercentSnapshot = pre.startPercent;
         int const sessionLevelID = pre.levelID;
         std::string const sessionLevelName = pre.levelName;
-        auto const sessionAttemptStart = pre.attemptStart;
+        auto const sessionAttemptStart = pre.attemptTimer.time();
         std::string const completeTitleSnapshot = pre.completeTitle();
         PlayLayer::levelComplete();
         auto const screenshotEpoch = ++m_fields->screenshotEpoch;
@@ -254,8 +254,8 @@ class $modify(WebhookPlayLayer, PlayLayer) {
         }
         if (!suppress && progressLegal) {
             if (fromStartpos) {
-                auto* layer = this;
-                geode::queueInMainThread([=] {
+                geode::queueInMainThread([=, layer = WeakRef<PlayLayer>(this)] {
+                    auto lockedLayer = layer.lock();
                     bool const sameSession = play_events::matchesLevelSession(
                         sessionLevelID, sessionLevelName, sessionAttemptStart
                     );
@@ -295,7 +295,7 @@ class $modify(WebhookPlayLayer, PlayLayer) {
                         }
                         else {
                             capturePlayLayerScreenshotAfterDelay(
-                                layer, captureStillValid, std::move(fireWebhook)
+                                lockedLayer.data(), captureStillValid, std::move(fireWebhook)
                             );
                         }
                     }
@@ -366,8 +366,9 @@ class $modify(WebhookPlayLayer, PlayLayer) {
                 WebhookMessage{
                     .title = session.exitTitle(),
                     .description = fmt::format("{} exited **{}**.", playerName, display.levelName),
-                    .color = session.mode == RunMode::Practice ? session.color() :
-                                                                 embed_color::levelExit(),
+                    .color = session.mode == RunMode::Practice ?
+                        session.color() :
+                        embed_color::fromKey("color-level-exit"),
                     .fields =
                         {
                             {"Level", display.levelName, true},

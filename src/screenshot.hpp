@@ -1,7 +1,7 @@
 #pragma once
 
+#include <Geode/utils/function.hpp>
 #include <cstdint>
-#include <functional>
 #include <optional>
 #include <vector>
 
@@ -13,14 +13,16 @@ struct CapturedScreenshotRgba {
     int height = 0;
 };
 
+using ScreenshotPng = std::optional<std::vector<std::uint8_t>>;
+using ScreenshotCallback = geode::Function<void(ScreenshotPng)>;
+using ScreenshotValidity = geode::Function<bool()>;
+
 std::optional<CapturedScreenshotRgba> capturePlayLayerScreenshotRgba(PlayLayer* playLayer);
 
 void spawnScreenshotEncodeToPngThen(
-    CapturedScreenshotRgba captured, int scalePercentClamped,
-    std::function<void(std::optional<std::vector<std::uint8_t>> png)> onMainThread
+    CapturedScreenshotRgba captured, int scalePercentClamped, ScreenshotCallback onMainThread
 );
 
 void capturePlayLayerScreenshotAfterDelay(
-    PlayLayer* playLayer, std::function<bool()> isStillValid,
-    std::function<void(std::optional<std::vector<std::uint8_t>> png)> onMainThread
+    PlayLayer* playLayer, ScreenshotValidity isStillValid, ScreenshotCallback onMainThread
 );

@@ -1,8 +1,8 @@
 #pragma once
 
+#include <Geode/utils/function.hpp>
 #include <chrono>
 #include <cstdint>
-#include <functional>
 #include <string>
 
 class PlayLayer;
@@ -16,11 +16,11 @@ namespace play_events {
     void queueStartposSegmentStart(PlayLayer* layer);
     void reopenLevelSessionIfNeeded(PlayLayer* layer);
     void sendDeathWebhookIfNeeded(
-        PlayLayer* layer, int currentPercent, int bestBefore, std::function<bool()> captureStillValid
+        PlayLayer* layer, int currentPercent, int bestBefore, geode::Function<bool()> captureStillValid
     );
     void sendNewBestWebhookIfNeeded(
         PlayLayer* layer, int percentAtDeath, int bestBeforeDeath,
-        std::function<bool()> captureStillValid
+        geode::Function<bool()> captureStillValid
     );
     void clearCompletedLevelExit(PlayLayer* layer);
     void queueCompletedLevelExit(PlayLayer* layer, std::int64_t elapsedMilliseconds);

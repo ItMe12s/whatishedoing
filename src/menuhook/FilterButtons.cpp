@@ -1,84 +1,64 @@
 #include "state.hpp"
 
 #include <Geode/Geode.hpp>
-#include <Geode/binding/CCMenuItemSpriteExtra.hpp>
+#include <Geode/binding/CCMenuItemToggler.hpp>
 #include <Geode/modify/EditLevelLayer.hpp>
 #include <Geode/modify/LevelInfoLayer.hpp>
+#include <Geode/utils/cocos.hpp>
 #include <cvolton.level-id-api/include/EditorIDs.hpp>
 
 using namespace geode::prelude;
 
 namespace {
 
-    struct FilterIcons {
-        cocos2d::CCSprite* inList = nullptr;
-        cocos2d::CCSprite* notInList = nullptr;
-    };
-
-    cocos2d::CCSprite* createFilterSprite(FilterIcons& icons) {
+    cocos2d::CCSprite* createFilterSprite(char const* checkFrame) {
         auto* base = cocos2d::CCSprite::createWithSpriteFrameName("GJ_plainBtn_001.png");
         if (!base) {
             return nullptr;
         }
-        icons.inList = cocos2d::CCSprite::createWithSpriteFrameName("GJ_checkOn_001.png");
-        icons.notInList = cocos2d::CCSprite::createWithSpriteFrameName("GJ_checkOff_001.png");
-        for (auto* icon : {icons.inList, icons.notInList}) {
-            if (icon) {
-                icon->setPosition(base->getContentSize() * 0.5f);
-                base->addChild(icon);
-            }
+        if (auto* check = cocos2d::CCSprite::createWithSpriteFrameName(checkFrame)) {
+            check->setPosition(base->getContentSize() * 0.5f);
+            base->addChild(check);
         }
         base->setScale(0.75f);
         return base;
     }
 
-    void refreshFilterIcons(GJGameLevel* level, FilterIcons const& icons) {
-        if (!level || !icons.inList || !icons.notInList) {
-            return;
+    CCMenuItemToggler* createFilterButton(GJGameLevel* level) {
+        auto* on = createFilterSprite("GJ_checkOn_001.png");
+        auto* off = createFilterSprite("GJ_checkOff_001.png");
+        if (!on || !off) {
+            return nullptr;
         }
-        int const id = EditorIDs::getID(level);
-        bool const inList = id > 0 && isIdInFilterList(id);
-        icons.inList->setVisible(inList);
-        icons.notInList->setVisible(!inList);
-    }
-
-    bool toggleFilter(GJGameLevel* level) {
-        if (!level) {
-            return false;
-        }
-        int const id = EditorIDs::getID(level);
-        if (id <= 0) {
-            return false;
-        }
-        setIdInFilterList(id, !isIdInFilterList(id));
-        return true;
+        auto* button = CCMenuItemExt::createToggler(on, off, [level](auto* toggler) {
+            int const id = level ? EditorIDs::getID(level) : 0;
+            if (id > 0) {
+                setIdInFilterList(id, !isIdInFilterList(id));
+            }
+            else {
+                toggler->toggle(false);
+            }
+        });
+        button->updateSprite();
+        int const id = level ? EditorIDs::getID(level) : 0;
+        button->toggle(id > 0 && isIdInFilterList(id));
+        return button;
     }
 
 } // namespace
 
 struct WIHLevelInfoLayer : Modify<WIHLevelInfoLayer, LevelInfoLayer> {
     struct Fields {
-        FilterIcons icons;
-        CCMenuItemSpriteExtra* button = nullptr;
+        CCMenuItemToggler* button = nullptr;
         int playVisibleTries = 0;
     };
-
-    void wihRefreshFilterIcon() {
-        refreshFilterIcons(m_level, m_fields->icons);
-    }
-
-    void onWihFilterToggle(cocos2d::CCObject*) {
-        if (toggleFilter(m_level)) {
-            wihRefreshFilterIcon();
-        }
-    }
 
     void wihCheckIfPlayVisible(float) {
         if (!m_fields->button) {
             this->unschedule(schedule_selector(WIHLevelInfoLayer::wihCheckIfPlayVisible));
             return;
         }
-        if (m_playBtnMenu && m_playBtnMenu->isVisible()) {
+        if (m_playBtnMenu && cocos::nodeIsVisible(m_playBtnMenu)) {
             m_fields->button->setVisible(true);
             this->unschedule(schedule_selector(WIHLevelInfoLayer::wihCheckIfPlayVisible));
             return;
@@ -103,13 +83,7 @@ struct WIHLevelInfoLayer : Modify<WIHLevelInfoLayer, LevelInfoLayer> {
         if (!favoriteButton || !settingsButton) {
             return true;
         }
-        auto* base = createFilterSprite(m_fields->icons);
-        if (!base) {
-            return true;
-        }
-        auto* button = CCMenuItemSpriteExtra::create(
-            base, nullptr, this, menu_selector(WIHLevelInfoLayer::onWihFilterToggle)
-        );
+        auto* button = createFilterButton(m_level);
         if (!button) {
             return true;
         }
@@ -121,7 +95,7 @@ struct WIHLevelInfoLayer : Modify<WIHLevelInfoLayer, LevelInfoLayer> {
 
         // Preserve the existing placement relative to the stock controls.
         float const step = button->getScaledContentSize().width;
-        if (favoriteButton->isVisible()) {
+        if (cocos::nodeIsVisible(favoriteButton)) {
             button->setPosition(
                 ccp(favoriteButton->getPositionX() + step, settingsButton->getPositionY())
             );
@@ -131,7 +105,6 @@ struct WIHLevelInfoLayer : Modify<WIHLevelInfoLayer, LevelInfoLayer> {
             button->setPosition(ccp(position.x + 2.f * step, position.y));
         }
 
-        wihRefreshFilterIcon();
         otherMenu->updateLayout();
         this->schedule(schedule_selector(WIHLevelInfoLayer::wihCheckIfPlayVisible));
         return true;
@@ -139,20 +112,6 @@ struct WIHLevelInfoLayer : Modify<WIHLevelInfoLayer, LevelInfoLayer> {
 };
 
 struct WIHEditLevelLayer : Modify<WIHEditLevelLayer, EditLevelLayer> {
-    struct Fields {
-        FilterIcons icons;
-    };
-
-    void wihRefreshFilterIcon() {
-        refreshFilterIcons(m_level, m_fields->icons);
-    }
-
-    void onWihFilterToggle(cocos2d::CCObject*) {
-        if (toggleFilter(m_level)) {
-            wihRefreshFilterIcon();
-        }
-    }
-
     bool init(GJGameLevel* level) {
         if (!EditLevelLayer::init(level)) {
             return false;
@@ -165,13 +124,7 @@ struct WIHEditLevelLayer : Modify<WIHEditLevelLayer, EditLevelLayer> {
         if (!infoButton) {
             return true;
         }
-        auto* base = createFilterSprite(m_fields->icons);
-        if (!base) {
-            return true;
-        }
-        auto* button = CCMenuItemSpriteExtra::create(
-            base, nullptr, this, menu_selector(WIHEditLevelLayer::onWihFilterToggle)
-        );
+        auto* button = createFilterButton(m_level);
         if (!button) {
             return true;
         }
@@ -184,7 +137,6 @@ struct WIHEditLevelLayer : Modify<WIHEditLevelLayer, EditLevelLayer> {
         button->setPosition(
             ccp(infoButton->getPositionX() + 2.f * step, infoButton->getPositionY() + step)
         );
-        wihRefreshFilterIcon();
         menu->updateLayout();
         return true;
     }
