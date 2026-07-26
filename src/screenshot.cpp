@@ -9,108 +9,114 @@
 #include <Geode/utils/random.hpp>
 #include <Geode/utils/string.hpp>
 #include <algorithm>
-#include <array>
 #include <cmath>
 #include <cocos2d.h>
 #include <filesystem>
 #include <memory>
-#include <numbers>
 #include <utility>
 #include <vector>
 
 using namespace geode::prelude;
 using namespace cocos2d;
 
-// https://www.kevincao.xyz/posts/image-resizing
 namespace {
 
-    double lanczos2(double x) {
-        constexpr double a = 2;
-        double const pi = std::numbers::pi_v<double>;
+    float lanczos2(float x) {
+        constexpr float radius = 2.f;
+        constexpr float pi = 3.14159265358979323846f; // Not using M_PI today.
+        x = std::abs(x);
         if (x == 0) {
-            return 1;
+            return 1.f;
         }
-        if (-a <= x && x < a) {
-            return a * std::sin(pi * x) * std::sin(pi * x / a) / (pi * pi * x * x);
+        if (x >= radius) {
+            return 0.f;
         }
-        return 0;
+        float const pix = pi * x;
+        return radius * std::sin(pix) * std::sin(pix / radius) / (pix * pix);
     }
 
-    struct LanczosKernelEntry {
-        int lo = 0;
-        int hi = 0;
-        std::array<double, 6> weights{};
+    struct LanczosKernel {
+        int first = 0;
+        std::vector<float> weights;
     };
 
+    std::vector<LanczosKernel> makeLanczosKernels(int sourceSize, int targetSize) {
+        float const scale = static_cast<float>(targetSize) / static_cast<float>(sourceSize);
+        float const support = 2.f / scale;
+        std::vector<LanczosKernel> kernels(static_cast<size_t>(targetSize));
+        for (int target = 0; target < targetSize; ++target) {
+            float const center = (static_cast<float>(target) + .5f) / scale - .5f;
+            int const first = std::max(0, static_cast<int>(std::ceil(center - support)));
+            int const last = std::min(sourceSize - 1, static_cast<int>(std::floor(center + support)));
+            auto& kernel = kernels[static_cast<size_t>(target)];
+            kernel.first = first;
+            kernel.weights.reserve(static_cast<size_t>(last - first + 1));
+            float total = 0.f;
+            for (int source = first; source <= last; ++source) {
+                float const weight = lanczos2((static_cast<float>(source) - center) * scale);
+                kernel.weights.push_back(weight);
+                total += weight;
+            }
+            for (float& weight : kernel.weights) {
+                weight /= total;
+            }
+        }
+        return kernels;
+    }
+
     std::vector<GLubyte> downscaleRgbaLanczos(GLubyte const* src, int sw, int sh, int dw, int dh) {
-        std::vector<GLubyte> out(static_cast<size_t>(dw) * static_cast<size_t>(dh) * 4);
-        double const zoomX = static_cast<double>(dw) / static_cast<double>(sw);
-        double const zoomY = static_cast<double>(dh) / static_cast<double>(sh);
-
-        std::vector<LanczosKernelEntry> weightsYs(static_cast<size_t>(dh));
-        for (int y = 0; y < dh; ++y) {
-            double const srcY = static_cast<double>(y) / zoomY;
-            int lo = static_cast<int>(std::ceil(srcY - 3));
-            if (lo < 0) {
-                lo = 0;
-            }
-            int hi = static_cast<int>(std::floor(srcY + 3 - 1e-6));
-            if (hi > sh - 1) {
-                hi = sh - 1;
-            }
-            weightsYs[static_cast<size_t>(y)].lo = lo;
-            weightsYs[static_cast<size_t>(y)].hi = hi;
-            for (int y_ = lo; y_ <= hi; ++y_) {
-                weightsYs[static_cast<size_t>(y)].weights[static_cast<size_t>(y_ - lo)] =
-                    lanczos2(static_cast<double>(y_) - srcY);
-            }
-        }
-
-        std::vector<LanczosKernelEntry> weightsXs(static_cast<size_t>(dw));
-        for (int x = 0; x < dw; ++x) {
-            double const srcX = static_cast<double>(x) / zoomX;
-            int lo = static_cast<int>(std::ceil(srcX - 3));
-            if (lo < 0) {
-                lo = 0;
-            }
-            int hi = static_cast<int>(std::floor(srcX + 3 - 1e-6));
-            if (hi > sw - 1) {
-                hi = sw - 1;
-            }
-            weightsXs[static_cast<size_t>(x)].lo = lo;
-            weightsXs[static_cast<size_t>(x)].hi = hi;
-            for (int x_ = lo; x_ <= hi; ++x_) {
-                weightsXs[static_cast<size_t>(x)].weights[static_cast<size_t>(x_ - lo)] =
-                    lanczos2(static_cast<double>(x_) - srcX);
-            }
-        }
-
-        for (int y = 0; y < dh; ++y) {
-            LanczosKernelEntry const& ky = weightsYs[static_cast<size_t>(y)];
+        auto const kernelsX = makeLanczosKernels(sw, dw);
+        auto const kernelsY = makeLanczosKernels(sh, dh);
+        std::vector<float> horizontal(static_cast<size_t>(dw) * static_cast<size_t>(sh) * 3);
+        for (int y = 0; y < sh; ++y) {
             for (int x = 0; x < dw; ++x) {
-                LanczosKernelEntry const& kx = weightsXs[static_cast<size_t>(x)];
-                size_t const outI = static_cast<size_t>(y * dw + x) * 4;
-                out[outI + 3] = 255;
-                for (int channel = 0; channel < 3; ++channel) {
-                    double sum = 0;
-                    double totalWeight = 0;
-                    for (int y_ = ky.lo; y_ <= ky.hi; ++y_) {
-                        double const wy = ky.weights[static_cast<size_t>(y_ - ky.lo)];
-                        for (int x_ = kx.lo; x_ <= kx.hi; ++x_) {
-                            double const wx = kx.weights[static_cast<size_t>(x_ - kx.lo)];
-                            double const weight = wx * wy;
-                            sum += static_cast<double>(
-                                       src[static_cast<size_t>(y_ * sw + x_) * 4 + channel]
-                                   ) *
-                                weight;
-                            totalWeight += weight;
-                        }
-                    }
-                    int const outChannel = totalWeight > 0 ? static_cast<int>(sum / totalWeight) : 0;
-
-                    out[outI + static_cast<size_t>(channel)] =
-                        static_cast<GLubyte>(std::clamp(outChannel, 0, 255));
+                auto const& kernel = kernelsX[static_cast<size_t>(x)];
+                float r = 0.f;
+                float g = 0.f;
+                float b = 0.f;
+                for (size_t tap = 0; tap < kernel.weights.size(); ++tap) {
+                    size_t const source = (static_cast<size_t>(y) * static_cast<size_t>(sw) +
+                                           static_cast<size_t>(kernel.first) + tap) *
+                        4;
+                    float const weight = kernel.weights[tap];
+                    r += static_cast<float>(src[source]) * weight;
+                    g += static_cast<float>(src[source + 1]) * weight;
+                    b += static_cast<float>(src[source + 2]) * weight;
                 }
+                size_t const target =
+                    (static_cast<size_t>(y) * static_cast<size_t>(dw) + static_cast<size_t>(x)) * 3;
+                horizontal[target] = r;
+                horizontal[target + 1] = g;
+                horizontal[target + 2] = b;
+            }
+        }
+
+        std::vector<GLubyte> out(static_cast<size_t>(dw) * static_cast<size_t>(dh) * 4);
+        for (int y = 0; y < dh; ++y) {
+            auto const& kernel = kernelsY[static_cast<size_t>(y)];
+            for (int x = 0; x < dw; ++x) {
+                float r = 0.f;
+                float g = 0.f;
+                float b = 0.f;
+                for (size_t tap = 0; tap < kernel.weights.size(); ++tap) {
+                    size_t const source =
+                        ((static_cast<size_t>(kernel.first) + tap) * static_cast<size_t>(dw) +
+                         static_cast<size_t>(x)) *
+                        3;
+                    float const weight = kernel.weights[tap];
+                    r += horizontal[source] * weight;
+                    g += horizontal[source + 1] * weight;
+                    b += horizontal[source + 2] * weight;
+                }
+                size_t const target =
+                    (static_cast<size_t>(y) * static_cast<size_t>(dw) + static_cast<size_t>(x)) * 4;
+                out[target] =
+                    static_cast<GLubyte>(std::clamp(static_cast<int>(std::lround(r)), 0, 255));
+                out[target + 1] =
+                    static_cast<GLubyte>(std::clamp(static_cast<int>(std::lround(g)), 0, 255));
+                out[target + 2] =
+                    static_cast<GLubyte>(std::clamp(static_cast<int>(std::lround(b)), 0, 255));
+                out[target + 3] = 255;
             }
         }
         return out;
