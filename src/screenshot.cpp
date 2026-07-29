@@ -306,13 +306,17 @@ namespace {
             layer(playLayer), isStillValid(std::move(validity)), callback(std::move(onMainThread)) {}
 
         void capture() {
+            auto onMainThread = std::exchange(callback, nullptr);
             auto locked = layer.lock();
-            captureScreenshotThen(locked.data(), isStillValid, std::move(callback));
+            captureScreenshotThen(locked.data(), isStillValid, std::move(onMainThread));
         }
 
         ~PendingScreenshotCapture() {
-            if (callback) {
-                callback(std::nullopt);
+            auto onMainThread = std::exchange(callback, nullptr);
+            if (onMainThread) {
+                geode::queueInMainThread([callback = std::move(onMainThread)]() mutable {
+                    callback(std::nullopt);
+                });
             }
         }
     };

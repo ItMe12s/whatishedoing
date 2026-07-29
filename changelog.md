@@ -2,6 +2,10 @@
 
 Currently no announcements for this mod.
 
+## 1.5.2
+
+- Fixed delayed screenshot webhooks crashing on iOS
+
 ## 1.5.1
 
 - New screenshot resizer

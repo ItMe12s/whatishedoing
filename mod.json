@@ -8,7 +8,7 @@
 	},
 	"id": "imes.whatishedoing",
 	"name": "What is he doing? (Webhook Logger)",
-	"version": "v1.5.1",
+	"version": "v1.5.2",
 	"developer": "imes",
 	"description": "Sends optional notifications based on your actions to a Discord webhook you configure.",
 	"dependencies": {
@@ -210,7 +210,7 @@
 		"screenshot-delay": {
 			"type": "float",
 			"name": "Screenshot Delay",
-			"description": "Seconds to wait before capturing so death hitboxes and completion or New Best UI can appear. Set to 0 to capture immediately.",
+			"description": "Seconds to wait before capturing so death hitboxes and completion or New Best UI can appear. Set to 0 to capture immediately. The mod will try its best to capture the screenshot at the correct time, but if the level restarts too fast or something happens to block the screenshot, the screenshot may not be sent.",
 			"default": 0.3,
 			"min": 0.0,
 			"max": 0.5,
