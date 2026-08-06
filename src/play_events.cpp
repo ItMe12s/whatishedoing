@@ -23,7 +23,7 @@ namespace play_events {
     namespace {
 
         struct PendingCompletedLevelExit {
-            WeakRef<PlayLayer> layer;
+            PlayLayer* layer = nullptr;
             int levelID = kLevelSessionClearedId;
             std::string levelName;
             std::string creatorName;
@@ -287,17 +287,11 @@ namespace play_events {
     }
 
     void clearCompletedLevelExit(PlayLayer* layer) {
-        if (s_pendingCompletedLevelExit) {
-            auto pendingLayer = s_pendingCompletedLevelExit->layer.lock();
-            if (!pendingLayer || pendingLayer.data() == layer) {
-                s_pendingCompletedLevelExit.reset();
-            }
+        if (s_pendingCompletedLevelExit && (!layer || s_pendingCompletedLevelExit->layer == layer)) {
+            s_pendingCompletedLevelExit.reset();
         }
-        if (s_sentCompletedLevelExit) {
-            auto sentLayer = s_sentCompletedLevelExit->layer.lock();
-            if (!sentLayer || sentLayer.data() == layer) {
-                s_sentCompletedLevelExit.reset();
-            }
+        if (s_sentCompletedLevelExit && (!layer || s_sentCompletedLevelExit->layer == layer)) {
+            s_sentCompletedLevelExit.reset();
         }
     }
 
@@ -318,8 +312,7 @@ namespace play_events {
         if (!s_pendingCompletedLevelExit) {
             return;
         }
-        auto pendingLayer = s_pendingCompletedLevelExit->layer.lock();
-        if (!pendingLayer || pendingLayer.data() != layer) {
+        if (s_pendingCompletedLevelExit->layer != layer) {
             s_pendingCompletedLevelExit.reset();
             return;
         }
@@ -356,13 +349,13 @@ namespace play_events {
         if (!s_sentCompletedLevelExit) {
             return false;
         }
-        auto sentLayer = s_sentCompletedLevelExit->layer.lock();
-        if (!sentLayer || sentLayer.data() != layer) {
+        if (s_sentCompletedLevelExit->layer != layer) {
             s_sentCompletedLevelExit.reset();
             return false;
         }
         auto const& sent = *s_sentCompletedLevelExit;
         if (!matchesLevelSession(sent.levelID, sent.levelName, sent.attemptStart)) {
+            s_sentCompletedLevelExit.reset();
             return false;
         }
         s_sentCompletedLevelExit.reset();

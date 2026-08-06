@@ -117,7 +117,7 @@ class $modify(WebhookPlayLayer, PlayLayer) {
     }
 
     bool init(GJGameLevel* level, bool useReplay, bool dontCreateObjects) {
-        play_events::clearCompletedLevelExit(this);
+        play_events::clearCompletedLevelExit(nullptr);
         auto& session = levelSession();
         std::string const levelName = level ? std::string(level->m_levelName) : "";
         int const levelID = level ? EditorIDs::getID(level) : kLevelSessionClearedId;

@@ -2,6 +2,10 @@
 
 Currently no announcements for this mod.
 
+## 1.5.3
+
+- Fixed being stuck on loading when returning to editor after completing a level
+
 ## 1.5.2
 
 - Fixed delayed screenshot webhooks crashing on iOS
