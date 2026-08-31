@@ -2,6 +2,10 @@
 
 Currently no announcements for this mod.
 
+## 1.6.0
+
+add stuff here...
+
 ## 1.5.3
 
 - Fixed being stuck on loading when returning to editor after completing a level

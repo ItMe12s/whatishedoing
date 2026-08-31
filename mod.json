@@ -1,5 +1,5 @@
 {
-	"geode": "5.8.2",
+	"geode": "5.9.0",
 	"gd": {
 		"win": "2.2081",
 		"android": "2.2081",
@@ -7,10 +7,10 @@
 		"ios": "2.2081"
 	},
 	"id": "imes.whatishedoing",
-	"name": "What is he doing? (Webhook Logger)",
-	"version": "v1.5.3",
+	"name": "What is he doing? (Discord Webhook)",
+	"version": "v1.6.0",
 	"developer": "imes",
-	"description": "Sends optional notifications based on your actions to a Discord webhook you configure.",
+	"description": "Sends notifications based on your actions to a Discord webhook.",
 	"dependencies": {
 		"cvolton.level-id-api": ">=v2.0.0",
 		"geode.node-ids": ">=v1.20.0"
