@@ -10,7 +10,6 @@
 #include <Geode/utils/general.hpp>
 #include <cvolton.level-id-api/include/EditorIDs.hpp>
 #include <utility>
-#include <vector>
 
 using namespace geode::prelude;
 
@@ -35,9 +34,9 @@ namespace {
             "notify-editor",
             WebhookMessage{
                 .title = actionTitle,
-                .description = fmt::format("{} left the editor.", playerName),
+                .description = fmt::format("**{}** left the editor.", playerName) +
+                    levelIdLine(display, session.levelID),
                 .color = embed_color::fromKey("color-editor-exit"),
-                .fields = makeLevelFields(display, session.levelID, true),
                 .footer = elapsed,
             }
         );
@@ -74,13 +73,13 @@ class $modify(WebhookLevelEditorLayer, LevelEditorLayer) {
             WebhookMessage{
                 .title = "Opened the Editor",
                 .description = fmt::format(
-                    "{} opened the editor to work on **{}** by **{}**.",
-                    playerName,
-                    display.levelName,
-                    display.creatorName
-                ),
+                                   "**{}** opened the editor to work on **{}** by **{}**.",
+                                   playerName,
+                                   display.levelName,
+                                   display.creatorName
+                               ) +
+                    levelIdLine(display, levelID),
                 .color = embed_color::fromKey("color-editor-open"),
-                .fields = makeLevelFields(display, levelID, true),
             }
         );
         return true;

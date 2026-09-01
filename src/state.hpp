@@ -68,7 +68,7 @@ LevelDisplay resolveLevelDisplay(
     int levelID, std::string const& rawLevelName, std::string const& rawCreatorName
 );
 
-std::vector<WebhookField> makeLevelFields(LevelDisplay const& display, int levelID, bool withID);
+std::string levelIdLine(LevelDisplay const& display, int levelID);
 bool isRedactionSuppressed(LevelDisplay const& display);
 
 bool isIdInFilterList(int id);

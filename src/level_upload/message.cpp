@@ -68,15 +68,10 @@ namespace level_upload {
         else {
             text = isUpdate ?
                 fmt::format(
-                    "**{}** updated a level!\n- Name: {}\n- ID:   {}\n-# {} ({} objects)",
-                    creator,
-                    name,
-                    id,
-                    length,
-                    objects
+                    "**{}** updated **{}**!\n- ID: {} • {} • {} objects", creator, name, id, length, objects
                 ) :
                 fmt::format(
-                    "**{}** dropped a new level!\n- Name: {}\n- ID:  {}\n-# {} ({} objects)",
+                    "**{}** dropped a new level **{}**!\n- ID: {} • {} • {} objects",
                     creator,
                     name,
                     id,

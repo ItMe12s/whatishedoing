@@ -25,7 +25,7 @@ $execute {
                 "notify-game-session",
                 WebhookMessage{
                     .title = "Opened Geometry Dash",
-                    .description = fmt::format("{} opened Geometry Dash!", playerName),
+                    .description = fmt::format("**{}** opened Geometry Dash!", playerName),
                     .color = embed_color::fromKey("color-game-open"),
                 }
             );
@@ -47,7 +47,7 @@ $execute {
             );
             WebhookMessage message{
                 .title = "Closed Geometry Dash",
-                .description = fmt::format("{} closed Geometry Dash.", playerName),
+                .description = fmt::format("**{}** closed Geometry Dash.", playerName),
                 .color = embed_color::fromKey("color-game-close"),
                 .footer = elapsed,
             };
@@ -90,7 +90,7 @@ $on_mod(Loaded) {
         sendWebhook(
             WebhookMessage{
                 .title = "Test Webhook",
-                .description = fmt::format("{} is testing the webhook!", playerName),
+                .description = fmt::format("**{}** is testing the webhook!", playerName),
                 .color = embed_color::fromKey("color-test-webhook"),
             }
         );

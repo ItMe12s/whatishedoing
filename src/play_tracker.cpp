@@ -158,13 +158,13 @@ class $modify(WebhookPlayLayer, PlayLayer) {
                 WebhookMessage{
                     .title = session.startTitle(),
                     .description = fmt::format(
-                        "{} is now playing **{}** by **{}**.",
-                        playerName,
-                        display.levelName,
-                        display.creatorName
-                    ),
+                                       "**{}** is now playing **{}** by **{}**.",
+                                       playerName,
+                                       display.levelName,
+                                       display.creatorName
+                                   ) +
+                        levelIdLine(display, levelID),
                     .color = session.color(),
-                    .fields = makeLevelFields(display, levelID, true),
                 }
             );
         }
@@ -260,7 +260,7 @@ class $modify(WebhookPlayLayer, PlayLayer) {
                                 WebhookMessage{
                                     .title = "Startpos Complete!",
                                     .description = fmt::format(
-                                        "{} got a **{}-{}%** run on "
+                                        "**{}** got a **{}-{}%** run on "
                                         "**{}** by **{}**.",
                                         playerName,
                                         startPercent,
@@ -269,12 +269,6 @@ class $modify(WebhookPlayLayer, PlayLayer) {
                                         display.creatorName
                                     ),
                                     .color = completeColor,
-                                    .fields =
-                                        {
-                                            {"Level", display.levelName, true},
-                                            {"Creator", display.creatorName, true},
-                                            {"Run", fmt::format("{}-100%", startPercent), true},
-                                        },
                                     .footer = elapsed,
                                     .screenshotPng = std::move(shot),
                                 }
@@ -302,10 +296,12 @@ class $modify(WebhookPlayLayer, PlayLayer) {
                         WebhookMessage{
                             .title = completeTitleSnapshot,
                             .description = fmt::format(
-                                "{} beat **{}** by **{}**!", playerName, display.levelName, display.creatorName
+                                "**{}** beat **{}** by **{}**!",
+                                playerName,
+                                display.levelName,
+                                display.creatorName
                             ),
                             .color = completeColor,
-                            .fields = makeLevelFields(display, sessionLevelID, false),
                             .footer = elapsed,
                             .screenshotPng = std::move(shot),
                         }

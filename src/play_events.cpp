@@ -60,10 +60,13 @@ namespace play_events {
             "notify-play-level",
             WebhookMessage{
                 .title = mode == RunMode::Practice ? "Exited a Practice Run" : "Exited a Level",
-                .description = fmt::format("{} exited **{}**.", playerName, display.levelName),
+                .description =
+                    fmt::format(
+                        "**{}** exited **{}** by **{}**.", playerName, display.levelName, display.creatorName
+                    ) +
+                    levelIdLine(display, levelID),
                 .color = mode == RunMode::Practice ? embed_color::fromKey("color-play-practice") :
                                                      embed_color::fromKey("color-level-exit"),
-                .fields = makeLevelFields(display, levelID, false),
                 .footer = std::move(footer),
             }
         );
@@ -172,33 +175,25 @@ namespace play_events {
         auto sendDeath = [=](std::optional<std::vector<std::uint8_t>> screenshot) {
             WebhookMessage message{
                 .title = "Died",
-                .description = fromStartpos ? fmt::format(
-                                                  "{} got a **{}-{}%** run on **{}** by **{}**.",
-                                                  playerName,
-                                                  deathStartPercent,
-                                                  currentPercent,
-                                                  display.levelName,
-                                                  display.creatorName
-                                              ) :
-                                              fmt::format(
-                                                  "{} died at **{}%** on **{}** by **{}**.",
-                                                  playerName,
-                                                  currentPercent,
-                                                  display.levelName,
-                                                  display.creatorName
-                                              ),
+                .description = fromStartpos ?
+                    fmt::format(
+                        "**{}** got a **{}-{}%** run on **{}** by **{}**.",
+                        playerName,
+                        deathStartPercent,
+                        currentPercent,
+                        display.levelName,
+                        display.creatorName
+                    ) :
+                    fmt::format(
+                        "**{}** died at **{}%** on **{}** by **{}**.",
+                        playerName,
+                        currentPercent,
+                        display.levelName,
+                        display.creatorName
+                    ),
                 .color = embed_color::fromKey("color-death"),
-                .fields = makeLevelFields(display, sessionLevelID, false),
                 .screenshotPng = std::move(screenshot),
             };
-            if (fromStartpos) {
-                message.fields.push_back(
-                    {"Run", fmt::format("{}-{}%", deathStartPercent, currentPercent), true}
-                );
-            }
-            else {
-                message.fields.push_back({"Percent", fmt::format("{}%", currentPercent), true});
-            }
             sendWebhook(std::move(message));
         };
         sendWithOptionalScreenshot(
@@ -257,21 +252,20 @@ namespace play_events {
         std::string const sessionLevelName = session.levelName;
         auto const sessionAttemptStart = session.attemptTimer.time();
         auto sendNewBest = [=](std::optional<std::vector<std::uint8_t>> screenshot) {
-            WebhookMessage message{
-                .title = "New Best!",
-                .description = fmt::format(
-                    "{} reached a new best of **{}%** on **{}** by **{}**.",
-                    playerName,
-                    effectiveBest,
-                    display.levelName,
-                    display.creatorName
-                ),
-                .color = embed_color::fromKey("color-new-best"),
-                .fields = makeLevelFields(display, sessionLevelID, false),
-                .screenshotPng = std::move(screenshot),
-            };
-            message.fields.push_back({"Best", fmt::format("{}%", effectiveBest), true});
-            sendWebhook(std::move(message));
+            sendWebhook(
+                WebhookMessage{
+                    .title = "New Best!",
+                    .description = fmt::format(
+                        "**{}** reached a new best of **{}%** on **{}** by **{}**.",
+                        playerName,
+                        effectiveBest,
+                        display.levelName,
+                        display.creatorName
+                    ),
+                    .color = embed_color::fromKey("color-new-best"),
+                    .screenshotPng = std::move(screenshot),
+                }
+            );
         };
         sendWithOptionalScreenshot(
             "screenshot-new-best",

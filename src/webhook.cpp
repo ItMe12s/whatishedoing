@@ -32,11 +32,8 @@ namespace webhook_impl {
 
     constexpr size_t kDiscordEmbedTitleMax = 256;
     constexpr size_t kDiscordEmbedDescriptionMax = 4096;
-    constexpr size_t kDiscordEmbedFieldNameMax = 256;
-    constexpr size_t kDiscordEmbedFieldValueMax = 1024;
     constexpr size_t kDiscordEmbedFooterMax = 2048;
     constexpr size_t kDiscordWebhookUsernameMax = 80;
-    constexpr size_t kDiscordEmbedFieldCountMax = 25;
 
     static Result<std::string> truncateDiscordText(
         std::string_view text, size_t maxCharacters, char const* context
@@ -166,8 +163,7 @@ namespace webhook_impl {
 
     Result<matjson::Value> buildWebhookPayload(
         std::string const& title, std::string const& description, int color,
-        std::vector<WebhookField> const& fields, std::string const& footer,
-        bool embedScreenshotAttachment
+        std::string const& footer, bool embedScreenshotAttachment
     ) {
         GEODE_UNWRAP_INTO(
             auto titleClamped,
@@ -182,35 +178,10 @@ namespace webhook_impl {
             truncateDiscordText(footer, kDiscordEmbedFooterMax, "webhook embed footer")
         );
 
-        auto fieldsArr = matjson::Value::array();
-        size_t const nFields = std::min(fields.size(), kDiscordEmbedFieldCountMax);
-        if (fields.size() > kDiscordEmbedFieldCountMax) {
-            log::warn(
-                "Webhook embed fields truncated from {} to {}", fields.size(), kDiscordEmbedFieldCountMax
-            );
-        }
-        for (size_t i = 0; i < nFields; ++i) {
-            auto const& f = fields[i];
-            GEODE_UNWRAP_INTO(
-                auto name,
-                truncateDiscordText(f.name, kDiscordEmbedFieldNameMax, "webhook embed field name")
-            );
-            GEODE_UNWRAP_INTO(
-                auto value,
-                truncateDiscordText(f.value, kDiscordEmbedFieldValueMax, "webhook embed field value")
-            );
-            auto obj = matjson::Value::object();
-            obj["name"] = std::move(name);
-            obj["value"] = std::move(value);
-            obj["inline"] = f.inlineField;
-            fieldsArr.push(obj);
-        }
-
         auto embed = matjson::Value::object();
         embed["title"] = std::move(titleClamped);
         embed["description"] = std::move(descClamped);
         embed["color"] = color;
-        embed["fields"] = fieldsArr;
         embed["timestamp"] = currentIso8601Utc();
         if (!footerClamped.empty()) {
             auto footerObj = matjson::Value::object();
@@ -289,7 +260,7 @@ namespace webhook_impl {
         }
     }
 
-    arc::Future<> postAsyncWithRetries(std::string const& url, int maxRetries, auto setupRequest) {
+    arc::Future<> postAsyncWithRetries(std::string url, int maxRetries, auto setupRequest) {
         for (int attempt = 0;; ++attempt) {
             auto req = web::WebRequest();
             setupRequest(req);
@@ -314,7 +285,7 @@ namespace webhook_impl {
         }
         bool const hasShot = message.screenshotPng.has_value() && !message.screenshotPng->empty();
         auto payloadResult = buildWebhookPayload(
-            message.title, message.description, message.color, message.fields, message.footer, hasShot
+            message.title, message.description, message.color, message.footer, hasShot
         );
         if (payloadResult.isErr()) {
             return;

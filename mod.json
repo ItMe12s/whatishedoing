@@ -10,7 +10,7 @@
 	"name": "What is he doing? (Discord Webhook)",
 	"version": "v1.6.0",
 	"developer": "imes",
-	"description": "Sends notifications based on your actions to a Discord webhook.",
+	"description": "Log your GD activities to a Discord webhook.",
 	"dependencies": {
 		"cvolton.level-id-api": ">=v2.0.0",
 		"geode.node-ids": ">=v1.20.0"

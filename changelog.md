@@ -4,7 +4,8 @@ Currently no announcements for this mod.
 
 ## 1.6.0
 
-add stuff here...
+- More compact message format
+- Optimized the code
 
 ## 1.5.3
 

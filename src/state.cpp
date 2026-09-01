@@ -64,7 +64,7 @@ std::string displayLevelName(std::string const& levelName) {
 }
 
 std::string displayCreatorName(std::string const& creatorName) {
-    return creatorName.empty() ? "Unknown" : creatorName;
+    return creatorName.empty() ? "-" : creatorName;
 }
 
 namespace {
@@ -120,15 +120,8 @@ LevelDisplay resolveLevelDisplay(
     return LevelDisplay{kRedactedLevelName, kRedactedCreatorName, false, true};
 }
 
-std::vector<WebhookField> makeLevelFields(LevelDisplay const& display, int levelID, bool withID) {
-    std::vector<WebhookField> fields = {
-        {"Level", display.levelName, true},
-        {"Creator", display.creatorName, true},
-    };
-    if (withID && display.showLevelID) {
-        fields.push_back({"Level ID", geode::utils::numToString(levelID), true});
-    }
-    return fields;
+std::string levelIdLine(LevelDisplay const& display, int levelID) {
+    return display.showLevelID ? fmt::format("\n-# Level ID: {}", levelID) : "";
 }
 
 bool isRedactionSuppressed(LevelDisplay const& display) {
