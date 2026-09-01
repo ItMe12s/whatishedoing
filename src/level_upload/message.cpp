@@ -47,9 +47,9 @@ namespace level_upload {
         bool const wantRolePing = rolePing && !roleID.empty();
         std::string creator = level->m_creatorName;
         std::string name = level->m_levelName;
-        std::string id = geode::utils::numToString((int)level->m_levelID);
+        std::string id = geode::utils::numToString(static_cast<int>(level->m_levelID));
         std::string length = lengthString(level->m_levelLength);
-        std::string objects = geode::utils::numToString((int)level->m_objectCount);
+        std::string objects = geode::utils::numToString(static_cast<int>(level->m_objectCount));
         std::string text;
 
         if (mod->getSettingValue<bool>("upload-use-custom-text")) {
@@ -66,24 +66,23 @@ namespace level_upload {
             text = processConditionals(text, isUpdate);
         }
         else {
-            text = isUpdate ? fmt::format(
-                                  "**{}** updated a level!\n- Name: {}\n- ID:  "
-                                  " {}\n-# {} ({} objects)",
-                                  creator,
-                                  name,
-                                  id,
-                                  length,
-                                  objects
-                              ) :
-                              fmt::format(
-                                  "**{}** dropped a new level!\n- Name: {}\n- "
-                                  "ID:  {}\n-# {} ({} objects)",
-                                  creator,
-                                  name,
-                                  id,
-                                  length,
-                                  objects
-                              );
+            text = isUpdate ?
+                fmt::format(
+                    "**{}** updated a level!\n- Name: {}\n- ID:   {}\n-# {} ({} objects)",
+                    creator,
+                    name,
+                    id,
+                    length,
+                    objects
+                ) :
+                fmt::format(
+                    "**{}** dropped a new level!\n- Name: {}\n- ID:  {}\n-# {} ({} objects)",
+                    creator,
+                    name,
+                    id,
+                    length,
+                    objects
+                );
             if (wantRolePing) text += fmt::format("\n||<@&{}>||", roleID);
         }
         return text;

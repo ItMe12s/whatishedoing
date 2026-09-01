@@ -9,7 +9,6 @@
 #include <Geode/Geode.hpp>
 #include <Geode/binding/GJGameLevel.hpp>
 #include <Geode/binding/PlayLayer.hpp>
-#include <Geode/utils/general.hpp>
 #include <cstdint>
 #include <cvolton.level-id-api/include/EditorIDs.hpp>
 #include <optional>
@@ -40,6 +39,34 @@ namespace play_events {
     void syncPlayMode(PlayLayer* layer) {
         auto& session = levelSession();
         session.mode = deriveRunMode(layer->m_isPracticeMode, layer->m_isTestMode);
+    }
+
+    void sendWithOptionalScreenshot(
+        char const* settingKey, PlayLayer* layer, ScreenshotValidity captureStillValid,
+        ScreenshotCallback send
+    ) {
+        if (!Mod::get()->getSettingValue<bool>(settingKey)) {
+            send(std::nullopt);
+            return;
+        }
+        capturePlayLayerScreenshotAfterDelay(layer, std::move(captureStillValid), std::move(send));
+    }
+
+    void sendLevelExitWebhook(
+        RunMode mode, LevelDisplay const& display, int levelID, std::string const& playerName,
+        std::string footer
+    ) {
+        sendWebhookIfEnabled(
+            "notify-play-level",
+            WebhookMessage{
+                .title = mode == RunMode::Practice ? "Exited a Practice Run" : "Exited a Level",
+                .description = fmt::format("{} exited **{}**.", playerName, display.levelName),
+                .color = mode == RunMode::Practice ? embed_color::fromKey("color-play-practice") :
+                                                     embed_color::fromKey("color-level-exit"),
+                .fields = makeLevelFields(display, levelID, false),
+                .footer = std::move(footer),
+            }
+        );
     }
 
     bool matchesLevelSession(int levelID, std::string const& levelName, Clock::time_point attemptStart) {
@@ -133,7 +160,7 @@ namespace play_events {
             std::string(layer->m_level->m_levelName),
             std::string(layer->m_level->m_creatorName)
         );
-        if (display.redacted && Mod::get()->getSettingValue<bool>("suppress-redacted")) {
+        if (isRedactionSuppressed(display)) {
             session.deathNotified = true;
             return;
         }
@@ -143,57 +170,39 @@ namespace play_events {
         auto const sessionAttemptStart = session.attemptTimer.time();
         session.deathNotified = true;
         auto sendDeath = [=](std::optional<std::vector<std::uint8_t>> screenshot) {
+            WebhookMessage message{
+                .title = "Died",
+                .description = fromStartpos ? fmt::format(
+                                                  "{} got a **{}-{}%** run on **{}** by **{}**.",
+                                                  playerName,
+                                                  deathStartPercent,
+                                                  currentPercent,
+                                                  display.levelName,
+                                                  display.creatorName
+                                              ) :
+                                              fmt::format(
+                                                  "{} died at **{}%** on **{}** by **{}**.",
+                                                  playerName,
+                                                  currentPercent,
+                                                  display.levelName,
+                                                  display.creatorName
+                                              ),
+                .color = embed_color::fromKey("color-death"),
+                .fields = makeLevelFields(display, sessionLevelID, false),
+                .screenshotPng = std::move(screenshot),
+            };
             if (fromStartpos) {
-                sendWebhook(
-                    WebhookMessage{
-                        .title = "Died",
-                        .description = fmt::format(
-                            "{} got a **{}-{}%** run on **{}** by **{}**.",
-                            playerName,
-                            deathStartPercent,
-                            currentPercent,
-                            display.levelName,
-                            display.creatorName
-                        ),
-                        .color = embed_color::fromKey("color-death"),
-                        .fields =
-                            {
-                                {"Level", display.levelName, true},
-                                {"Creator", display.creatorName, true},
-                                {"Run", fmt::format("{}-{}%", deathStartPercent, currentPercent), true},
-                            },
-                        .screenshotPng = std::move(screenshot),
-                    }
+                message.fields.push_back(
+                    {"Run", fmt::format("{}-{}%", deathStartPercent, currentPercent), true}
                 );
             }
             else {
-                sendWebhook(
-                    WebhookMessage{
-                        .title = "Died",
-                        .description = fmt::format(
-                            "{} died at **{}%** on **{}** by **{}**.",
-                            playerName,
-                            currentPercent,
-                            display.levelName,
-                            display.creatorName
-                        ),
-                        .color = embed_color::fromKey("color-death"),
-                        .fields =
-                            {
-                                {"Level", display.levelName, true},
-                                {"Creator", display.creatorName, true},
-                                {"Percent", fmt::format("{}%", currentPercent), true},
-                            },
-                        .screenshotPng = std::move(screenshot),
-                    }
-                );
+                message.fields.push_back({"Percent", fmt::format("{}%", currentPercent), true});
             }
+            sendWebhook(std::move(message));
         };
-        if (!Mod::get()->getSettingValue<bool>("screenshot-death")) {
-            sendDeath(std::nullopt);
-            return;
-        }
-        capturePlayLayerScreenshotAfterDelay(
+        sendWithOptionalScreenshot(
+            "screenshot-death",
             layer,
             [captureStillValid = std::move(captureStillValid),
              sessionLevelID,
@@ -248,32 +257,24 @@ namespace play_events {
         std::string const sessionLevelName = session.levelName;
         auto const sessionAttemptStart = session.attemptTimer.time();
         auto sendNewBest = [=](std::optional<std::vector<std::uint8_t>> screenshot) {
-            sendWebhook(
-                WebhookMessage{
-                    .title = "New Best!",
-                    .description = fmt::format(
-                        "{} reached a new best of **{}%** on **{}** by **{}**.",
-                        playerName,
-                        effectiveBest,
-                        display.levelName,
-                        display.creatorName
-                    ),
-                    .color = embed_color::fromKey("color-new-best"),
-                    .fields =
-                        {
-                            {"Level", display.levelName, true},
-                            {"Creator", display.creatorName, true},
-                            {"Best", fmt::format("{}%", effectiveBest), true},
-                        },
-                    .screenshotPng = std::move(screenshot),
-                }
-            );
+            WebhookMessage message{
+                .title = "New Best!",
+                .description = fmt::format(
+                    "{} reached a new best of **{}%** on **{}** by **{}**.",
+                    playerName,
+                    effectiveBest,
+                    display.levelName,
+                    display.creatorName
+                ),
+                .color = embed_color::fromKey("color-new-best"),
+                .fields = makeLevelFields(display, sessionLevelID, false),
+                .screenshotPng = std::move(screenshot),
+            };
+            message.fields.push_back({"Best", fmt::format("{}%", effectiveBest), true});
+            sendWebhook(std::move(message));
         };
-        if (!Mod::get()->getSettingValue<bool>("screenshot-new-best")) {
-            sendNewBest(std::nullopt);
-            return;
-        }
-        capturePlayLayerScreenshotAfterDelay(
+        sendWithOptionalScreenshot(
+            "screenshot-new-best",
             layer,
             [captureStillValid = std::move(captureStillValid),
              sessionLevelID,
@@ -321,27 +322,15 @@ namespace play_events {
         s_sentCompletedLevelExit = pending;
         auto const display =
             resolveLevelDisplay(pending.levelID, pending.levelName, pending.creatorName);
-        bool const suppress =
-            display.redacted && Mod::get()->getSettingValue<bool>("suppress-redacted");
-        if (suppress) {
+        if (isRedactionSuppressed(display)) {
             return;
         }
-        auto const playerName = getPlayerName();
-        sendWebhookIfEnabled(
-            "notify-play-level",
-            WebhookMessage{
-                .title = pending.mode == RunMode::Practice ? "Exited a Practice Run" : "Exited a Level",
-                .description = fmt::format("{} exited **{}**.", playerName, display.levelName),
-                .color = pending.mode == RunMode::Practice ?
-                    embed_color::fromKey("color-play-practice") :
-                    embed_color::fromKey("color-level-exit"),
-                .fields =
-                    {
-                        {"Level", display.levelName, true},
-                        {"Creator", display.creatorName, true},
-                    },
-                .footer = text_policy::formatDurationMs(pending.elapsedMs),
-            }
+        sendLevelExitWebhook(
+            pending.mode,
+            display,
+            pending.levelID,
+            getPlayerName(),
+            text_policy::formatDurationMs(pending.elapsedMs)
         );
     }
 

@@ -45,25 +45,17 @@ $execute {
             auto const elapsed = text_policy::formatDuration(
                 static_cast<int>(session.timer.elapsed<std::chrono::seconds>())
             );
+            WebhookMessage message{
+                .title = "Closed Geometry Dash",
+                .description = fmt::format("{} closed Geometry Dash.", playerName),
+                .color = embed_color::fromKey("color-game-close"),
+                .footer = elapsed,
+            };
             if (Mod::get()->getSettingValue<bool>("blocking-webhook")) {
-                sendWebhookBlocking(
-                    WebhookMessage{
-                        .title = "Closed Geometry Dash",
-                        .description = fmt::format("{} closed Geometry Dash.", playerName),
-                        .color = embed_color::fromKey("color-game-close"),
-                        .footer = elapsed,
-                    }
-                );
+                sendWebhookBlocking(std::move(message));
             }
             else {
-                sendWebhook(
-                    WebhookMessage{
-                        .title = "Closed Geometry Dash",
-                        .description = fmt::format("{} closed Geometry Dash.", playerName),
-                        .color = embed_color::fromKey("color-game-close"),
-                        .footer = elapsed,
-                    }
-                );
+                sendWebhook(std::move(message));
             }
         })
         .leak();

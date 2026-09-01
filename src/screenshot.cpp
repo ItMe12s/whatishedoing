@@ -64,6 +64,10 @@ namespace {
         return kernels;
     }
 
+    GLubyte toByte(float value) {
+        return static_cast<GLubyte>(std::clamp(static_cast<int>(std::lround(value)), 0, 255));
+    }
+
     std::vector<GLubyte> downscaleRgbaLanczos(GLubyte const* src, int sw, int sh, int dw, int dh) {
         auto const kernelsX = makeLanczosKernels(sw, dw);
         auto const kernelsY = makeLanczosKernels(sh, dh);
@@ -110,12 +114,9 @@ namespace {
                 }
                 size_t const target =
                     (static_cast<size_t>(y) * static_cast<size_t>(dw) + static_cast<size_t>(x)) * 4;
-                out[target] =
-                    static_cast<GLubyte>(std::clamp(static_cast<int>(std::lround(r)), 0, 255));
-                out[target + 1] =
-                    static_cast<GLubyte>(std::clamp(static_cast<int>(std::lround(g)), 0, 255));
-                out[target + 2] =
-                    static_cast<GLubyte>(std::clamp(static_cast<int>(std::lround(b)), 0, 255));
+                out[target] = toByte(r);
+                out[target + 1] = toByte(g);
+                out[target + 2] = toByte(b);
                 out[target + 3] = 255;
             }
         }
@@ -179,100 +180,105 @@ namespace {
 
 } // namespace
 
-std::optional<CapturedScreenshotRgba> capturePlayLayerScreenshotRgba(PlayLayer* playLayer) {
-    if (!playLayer) {
-        return std::nullopt;
-    }
+namespace {
 
-    auto* director = CCDirector::sharedDirector();
-    if (!director) {
-        return std::nullopt;
-    }
-    auto* glview = director->getOpenGLView();
-    if (!glview) {
-        return std::nullopt;
-    }
-
-    auto const size = director->getWinSize();
-    int const logicalWidth = static_cast<int>(size.width);
-    int const logicalHeight = static_cast<int>(size.height);
-    if (logicalWidth <= 0 || logicalHeight <= 0) {
-        return std::nullopt;
-    }
-
-    auto* rt = CCRenderTexture::create(logicalWidth, logicalHeight);
-    if (!rt) {
-        return std::nullopt;
-    }
-
-    auto const texSize = rt->getSprite()->getTexture()->getContentSizeInPixels();
-    int const pixelWidth = static_cast<int>(texSize.width);
-    int const pixelHeight = static_cast<int>(texSize.height);
-    if (pixelWidth <= 0 || pixelHeight <= 0) {
-        return std::nullopt;
-    }
-
-    auto const oldScaleX = glview->m_fScaleX;
-    auto const oldScaleY = glview->m_fScaleY;
-    auto const oldResolution = glview->getDesignResolutionSize();
-    auto const oldScreenSize = glview->m_obScreenSize;
-
-    auto const displayFactor = geode::utils::getDisplayFactor();
-    glview->m_fScaleX = static_cast<float>(pixelWidth) / size.width / displayFactor;
-    glview->m_fScaleY = static_cast<float>(pixelHeight) / size.height / displayFactor;
-
-    auto const aspectRatio = static_cast<float>(pixelWidth) / static_cast<float>(pixelHeight);
-    auto const newRes = CCSize{std::round(320.f * aspectRatio), 320.f};
-
-    director->m_obWinSizeInPoints = newRes;
-    glview->m_obScreenSize = CCSize{static_cast<float>(pixelWidth), static_cast<float>(pixelHeight)};
-    glview->setDesignResolutionSize(newRes.width, newRes.height, kResolutionExactFit);
-
-    rt->beginWithClear(0, 0, 0, 0);
-    playLayer->visit();
-
-    auto const bufBytes = static_cast<size_t>(pixelWidth) * static_cast<size_t>(pixelHeight) * 4;
-    CapturedScreenshotRgba cap;
-    cap.width = pixelWidth;
-    cap.height = pixelHeight;
-    cap.rgba.resize(bufBytes);
-    GLint packAlign = 0;
-    glGetIntegerv(GL_PACK_ALIGNMENT, &packAlign);
-    glPixelStorei(GL_PACK_ALIGNMENT, 1);
-    glReadPixels(0, 0, pixelWidth, pixelHeight, GL_RGBA, GL_UNSIGNED_BYTE, cap.rgba.data());
-    glPixelStorei(GL_PACK_ALIGNMENT, packAlign);
-
-    rt->end();
-
-    glview->m_fScaleX = oldScaleX;
-    glview->m_fScaleY = oldScaleY;
-    director->m_obWinSizeInPoints = oldResolution;
-    glview->m_obScreenSize = oldScreenSize;
-    glview->setDesignResolutionSize(oldResolution.width, oldResolution.height, kResolutionExactFit);
-    director->setViewport();
-
-    auto const rowBytes = static_cast<size_t>(pixelWidth) * 4;
-    for (int i = 0; i < pixelHeight / 2; ++i) {
-        auto* top = cap.rgba.data() + static_cast<size_t>(i) * rowBytes;
-        auto* bottom = cap.rgba.data() + static_cast<size_t>(pixelHeight - i - 1) * rowBytes;
-        std::swap_ranges(top, top + rowBytes, bottom);
-    }
-
-    return cap;
-}
-
-void spawnScreenshotEncodeToPngThen(
-    CapturedScreenshotRgba captured, int scalePct, ScreenshotCallback onMainThread
-) {
-    auto const tmp = Mod::get()->getTempDir() /
-        fmt::format("whatishedoing_cap_{}.png", geode::utils::random::generateUUID());
-    auto task = geode::async::runtime().spawnBlocking<ScreenshotPng>(
-        [cap = std::move(captured), scalePct, tmp]() mutable {
-            return encodeRgbaToPngBytes(std::move(cap.rgba), cap.width, cap.height, scalePct, tmp);
+    std::optional<CapturedScreenshotRgba> capturePlayLayerScreenshotRgba(PlayLayer* playLayer) {
+        if (!playLayer) {
+            return std::nullopt;
         }
-    );
-    geode::async::spawn(std::move(task), std::move(onMainThread));
-}
+
+        auto* director = CCDirector::sharedDirector();
+        if (!director) {
+            return std::nullopt;
+        }
+        auto* glview = director->getOpenGLView();
+        if (!glview) {
+            return std::nullopt;
+        }
+
+        auto const size = director->getWinSize();
+        int const logicalWidth = static_cast<int>(size.width);
+        int const logicalHeight = static_cast<int>(size.height);
+        if (logicalWidth <= 0 || logicalHeight <= 0) {
+            return std::nullopt;
+        }
+
+        auto* rt = CCRenderTexture::create(logicalWidth, logicalHeight);
+        if (!rt) {
+            return std::nullopt;
+        }
+
+        auto const texSize = rt->getSprite()->getTexture()->getContentSizeInPixels();
+        int const pixelWidth = static_cast<int>(texSize.width);
+        int const pixelHeight = static_cast<int>(texSize.height);
+        if (pixelWidth <= 0 || pixelHeight <= 0) {
+            return std::nullopt;
+        }
+
+        auto const oldScaleX = glview->m_fScaleX;
+        auto const oldScaleY = glview->m_fScaleY;
+        auto const oldResolution = glview->getDesignResolutionSize();
+        auto const oldScreenSize = glview->m_obScreenSize;
+
+        auto const displayFactor = geode::utils::getDisplayFactor();
+        glview->m_fScaleX = static_cast<float>(pixelWidth) / size.width / displayFactor;
+        glview->m_fScaleY = static_cast<float>(pixelHeight) / size.height / displayFactor;
+
+        auto const aspectRatio = static_cast<float>(pixelWidth) / static_cast<float>(pixelHeight);
+        auto const newRes = CCSize{std::round(320.f * aspectRatio), 320.f};
+
+        director->m_obWinSizeInPoints = newRes;
+        glview->m_obScreenSize =
+            CCSize{static_cast<float>(pixelWidth), static_cast<float>(pixelHeight)};
+        glview->setDesignResolutionSize(newRes.width, newRes.height, kResolutionExactFit);
+
+        rt->beginWithClear(0, 0, 0, 0);
+        playLayer->visit();
+
+        auto const bufBytes = static_cast<size_t>(pixelWidth) * static_cast<size_t>(pixelHeight) * 4;
+        CapturedScreenshotRgba cap;
+        cap.width = pixelWidth;
+        cap.height = pixelHeight;
+        cap.rgba.resize(bufBytes);
+        GLint packAlign = 0;
+        glGetIntegerv(GL_PACK_ALIGNMENT, &packAlign);
+        glPixelStorei(GL_PACK_ALIGNMENT, 1);
+        glReadPixels(0, 0, pixelWidth, pixelHeight, GL_RGBA, GL_UNSIGNED_BYTE, cap.rgba.data());
+        glPixelStorei(GL_PACK_ALIGNMENT, packAlign);
+
+        rt->end();
+
+        glview->m_fScaleX = oldScaleX;
+        glview->m_fScaleY = oldScaleY;
+        director->m_obWinSizeInPoints = oldResolution;
+        glview->m_obScreenSize = oldScreenSize;
+        glview->setDesignResolutionSize(oldResolution.width, oldResolution.height, kResolutionExactFit);
+        director->setViewport();
+
+        auto const rowBytes = static_cast<size_t>(pixelWidth) * 4;
+        for (int i = 0; i < pixelHeight / 2; ++i) {
+            auto* top = cap.rgba.data() + static_cast<size_t>(i) * rowBytes;
+            auto* bottom = cap.rgba.data() + static_cast<size_t>(pixelHeight - i - 1) * rowBytes;
+            std::swap_ranges(top, top + rowBytes, bottom);
+        }
+
+        return cap;
+    }
+
+    void spawnScreenshotEncodeToPngThen(
+        CapturedScreenshotRgba captured, int scalePct, ScreenshotCallback onMainThread
+    ) {
+        auto const tmp = Mod::get()->getTempDir() /
+            fmt::format("whatishedoing_cap_{}.png", geode::utils::random::generateUUID());
+        auto task = geode::async::runtime().spawnBlocking<ScreenshotPng>([cap = std::move(captured),
+                                                                          scalePct,
+                                                                          tmp]() mutable {
+            return encodeRgbaToPngBytes(std::move(cap.rgba), cap.width, cap.height, scalePct, tmp);
+        });
+        geode::async::spawn(std::move(task), std::move(onMainThread));
+    }
+
+} // namespace
 
 namespace {
 

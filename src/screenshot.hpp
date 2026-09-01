@@ -17,12 +17,6 @@ using ScreenshotPng = std::optional<std::vector<std::uint8_t>>;
 using ScreenshotCallback = geode::Function<void(ScreenshotPng)>;
 using ScreenshotValidity = geode::Function<bool()>;
 
-std::optional<CapturedScreenshotRgba> capturePlayLayerScreenshotRgba(PlayLayer* playLayer);
-
-void spawnScreenshotEncodeToPngThen(
-    CapturedScreenshotRgba captured, int scalePercentClamped, ScreenshotCallback onMainThread
-);
-
 void capturePlayLayerScreenshotAfterDelay(
     PlayLayer* playLayer, ScreenshotValidity isStillValid, ScreenshotCallback onMainThread
 );

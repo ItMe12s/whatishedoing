@@ -24,10 +24,6 @@ std::string LevelSession::startTitle() const {
     return mode == RunMode::Practice ? "Playing a Level (Practice)" : "Playing a Level";
 }
 
-std::string LevelSession::exitTitle() const {
-    return mode == RunMode::Practice ? "Exited a Practice Run" : "Exited a Level";
-}
-
 std::string LevelSession::completeTitle() const {
     return mode == RunMode::Practice ? "Practice Run Complete!" : "Level Complete!";
 }
@@ -122,4 +118,19 @@ LevelDisplay resolveLevelDisplay(
         return normal;
     }
     return LevelDisplay{kRedactedLevelName, kRedactedCreatorName, false, true};
+}
+
+std::vector<WebhookField> makeLevelFields(LevelDisplay const& display, int levelID, bool withID) {
+    std::vector<WebhookField> fields = {
+        {"Level", display.levelName, true},
+        {"Creator", display.creatorName, true},
+    };
+    if (withID && display.showLevelID) {
+        fields.push_back({"Level ID", geode::utils::numToString(levelID), true});
+    }
+    return fields;
+}
+
+bool isRedactionSuppressed(LevelDisplay const& display) {
+    return display.redacted && Mod::get()->getSettingValue<bool>("suppress-redacted");
 }

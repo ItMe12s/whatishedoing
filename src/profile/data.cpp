@@ -111,49 +111,44 @@ namespace profile {
             return out;
         }
 
+        template <class T, class Parse>
+        void setIfOk(matjson::Value const& v, char const* key, Parse parse) {
+            if (auto r = parse(v); r.isOk()) {
+                Mod::get()->setSettingValue<T>(key, r.unwrap());
+            }
+        }
+
         void applyBlobToSettings(matjson::Value const& blob) {
             if (!blob.isObject()) return;
             for (auto const& t : kTracked) {
                 if (!blob.contains(t.key)) continue;
                 auto const& v = blob[t.key];
                 switch (t.kind) {
-                    case Kind::Bool: {
-                        auto r = v.asBool();
-                        if (r.isOk()) {
-                            Mod::get()->setSettingValue<bool>(t.key, r.unwrap());
-                        }
+                    case Kind::Bool:
+                        setIfOk<bool>(v, t.key, [](auto& v) {
+                            return v.asBool();
+                        });
                         break;
-                    }
-                    case Kind::Int: {
-                        auto r = v.asInt();
-                        if (r.isOk()) {
-                            Mod::get()->setSettingValue<int64_t>(
-                                t.key, static_cast<int64_t>(r.unwrap())
-                            );
-                        }
+                    case Kind::Int:
+                        setIfOk<int64_t>(v, t.key, [](auto& v) {
+                            return v.asInt();
+                        });
                         break;
-                    }
-                    case Kind::Float: {
-                        auto r = v.asDouble();
-                        if (r.isOk()) {
-                            Mod::get()->setSettingValue<double>(t.key, r.unwrap());
-                        }
+                    case Kind::Float:
+                        setIfOk<double>(v, t.key, [](auto& v) {
+                            return v.asDouble();
+                        });
                         break;
-                    }
-                    case Kind::String: {
-                        auto r = v.asString();
-                        if (r.isOk()) {
-                            Mod::get()->setSettingValue<std::string>(t.key, r.unwrap());
-                        }
+                    case Kind::String:
+                        setIfOk<std::string>(v, t.key, [](auto& v) {
+                            return v.asString();
+                        });
                         break;
-                    }
-                    case Kind::Color: {
-                        auto r = matjson::Serialize<cocos2d::ccColor3B>::fromJson(v);
-                        if (r.isOk()) {
-                            Mod::get()->setSettingValue<cocos2d::ccColor3B>(t.key, r.unwrap());
-                        }
+                    case Kind::Color:
+                        setIfOk<cocos2d::ccColor3B>(v, t.key, [](auto& v) {
+                            return v.template as<cocos2d::ccColor3B>();
+                        });
                         break;
-                    }
                 }
             }
         }

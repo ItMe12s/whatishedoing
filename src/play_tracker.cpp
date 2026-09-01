@@ -11,8 +11,6 @@
 #include <Geode/binding/PlayLayer.hpp>
 #include <Geode/modify/EndLevelLayer.hpp>
 #include <Geode/modify/PlayLayer.hpp>
-#include <Geode/utils/general.hpp>
-#include <Geode/utils/string.hpp>
 #include <cmath>
 #include <cstdint>
 #include <cvolton.level-id-api/include/EditorIDs.hpp>
@@ -152,15 +150,8 @@ class $modify(WebhookPlayLayer, PlayLayer) {
         auto const playerName = getPlayerName();
         if (!isContinuation) {
             auto const display = resolveLevelDisplay(levelID, levelName, creatorName);
-            if (display.redacted && Mod::get()->getSettingValue<bool>("suppress-redacted")) {
+            if (isRedactionSuppressed(display)) {
                 return true;
-            }
-            std::vector<WebhookField> fields = {
-                {"Level", display.levelName, true},
-                {"Creator", display.creatorName, true},
-            };
-            if (display.showLevelID) {
-                fields.push_back({"Level ID", geode::utils::numToString(levelID), true});
             }
             sendWebhookIfEnabled(
                 "notify-play-level",
@@ -173,7 +164,7 @@ class $modify(WebhookPlayLayer, PlayLayer) {
                         display.creatorName
                     ),
                     .color = session.color(),
-                    .fields = std::move(fields),
+                    .fields = makeLevelFields(display, levelID, true),
                 }
             );
         }
@@ -247,8 +238,7 @@ class $modify(WebhookPlayLayer, PlayLayer) {
         else {
             play_events::markCurrentBestHandled(this);
         }
-        bool const suppress =
-            display.redacted && Mod::get()->getSettingValue<bool>("suppress-redacted");
+        bool const suppress = isRedactionSuppressed(display);
         if (!suppress) {
             play_events::queueCompletedLevelExit(this, elapsedMs);
         }
@@ -290,14 +280,12 @@ class $modify(WebhookPlayLayer, PlayLayer) {
                                 }
                             );
                         };
-                        if (!Mod::get()->getSettingValue<bool>("screenshot-level-complete")) {
-                            fireWebhook(std::nullopt);
-                        }
-                        else {
-                            capturePlayLayerScreenshotAfterDelay(
-                                lockedLayer.data(), captureStillValid, std::move(fireWebhook)
-                            );
-                        }
+                        play_events::sendWithOptionalScreenshot(
+                            "screenshot-level-complete",
+                            lockedLayer.data(),
+                            captureStillValid,
+                            std::move(fireWebhook)
+                        );
                     }
                     if (sameSession) {
                         levelSession().reset();
@@ -317,24 +305,15 @@ class $modify(WebhookPlayLayer, PlayLayer) {
                                 "{} beat **{}** by **{}**!", playerName, display.levelName, display.creatorName
                             ),
                             .color = completeColor,
-                            .fields =
-                                {
-                                    {"Level", display.levelName, true},
-                                    {"Creator", display.creatorName, true},
-                                },
+                            .fields = makeLevelFields(display, sessionLevelID, false),
                             .footer = elapsed,
                             .screenshotPng = std::move(shot),
                         }
                     );
                 };
-                if (!Mod::get()->getSettingValue<bool>("screenshot-level-complete")) {
-                    fireWebhook(std::nullopt);
-                }
-                else {
-                    capturePlayLayerScreenshotAfterDelay(
-                        this, captureStillValid, std::move(fireWebhook)
-                    );
-                }
+                play_events::sendWithOptionalScreenshot(
+                    "screenshot-level-complete", this, captureStillValid, std::move(fireWebhook)
+                );
             }
         }
         clearCheatState();
@@ -355,27 +334,15 @@ class $modify(WebhookPlayLayer, PlayLayer) {
         }
         play_events::syncPlayMode(this);
         auto const playerName = getPlayerName();
-        auto const elapsed = text_policy::formatDurationMs(session.elapsedMilliseconds());
         auto const display =
             resolveLevelDisplay(session.levelID, session.levelName, session.creatorName);
-        bool const suppress =
-            display.redacted && Mod::get()->getSettingValue<bool>("suppress-redacted");
-        if (!suppress) {
-            sendWebhookIfEnabled(
-                "notify-play-level",
-                WebhookMessage{
-                    .title = session.exitTitle(),
-                    .description = fmt::format("{} exited **{}**.", playerName, display.levelName),
-                    .color = session.mode == RunMode::Practice ?
-                        session.color() :
-                        embed_color::fromKey("color-level-exit"),
-                    .fields =
-                        {
-                            {"Level", display.levelName, true},
-                            {"Creator", display.creatorName, true},
-                        },
-                    .footer = elapsed,
-                }
+        if (!isRedactionSuppressed(display)) {
+            play_events::sendLevelExitWebhook(
+                session.mode,
+                display,
+                session.levelID,
+                playerName,
+                text_policy::formatDurationMs(session.elapsedMilliseconds())
             );
         }
         session.reset();

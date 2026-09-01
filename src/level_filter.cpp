@@ -1,31 +1,30 @@
 #include "level_filter.hpp"
 
 #include <algorithm>
+#include <cctype>
 #include <charconv>
-#include <locale>
-#include <sstream>
+#include <ranges>
+#include <string>
+#include <string_view>
 #include <utility>
 
 namespace level_filter {
 
     LevelIds parseLevelIds(std::string_view raw) {
         std::string normalized(raw);
-        auto const& locale = std::locale::classic();
         std::ranges::replace_if(
             normalized,
-            [&locale](char c) {
-                return c == ',' || std::isspace(c, locale);
+            [](unsigned char c) {
+                return c == ',' || std::isspace(c);
             },
             ' '
         );
 
         LevelIds ids;
-        std::istringstream input(std::move(normalized));
-        input.imbue(locale);
-        for (std::string token; input >> token;) {
+        for (auto const part : std::views::split(normalized, ' ')) {
+            std::string_view const token{part.begin(), part.end()};
             int id = 0;
-            auto const result = std::from_chars(token.data(), token.data() + token.size(), id);
-            if (result.ec == std::errc{}) {
+            if (std::from_chars(token.data(), token.data() + token.size(), id).ec == std::errc{}) {
                 ids.insert(id);
             }
         }

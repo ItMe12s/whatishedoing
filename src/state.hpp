@@ -1,6 +1,7 @@
 #pragma once
 
 #include "play_policy.hpp"
+#include "webhook.hpp"
 
 #include <chrono>
 #include <cstdint>
@@ -33,7 +34,6 @@ struct LevelSession {
 
     int64_t elapsedMilliseconds() const;
     std::string startTitle() const;
-    std::string exitTitle() const;
     std::string completeTitle() const;
     int color() const;
     void reset();
@@ -67,6 +67,9 @@ struct LevelDisplay {
 LevelDisplay resolveLevelDisplay(
     int levelID, std::string const& rawLevelName, std::string const& rawCreatorName
 );
+
+std::vector<WebhookField> makeLevelFields(LevelDisplay const& display, int levelID, bool withID);
+bool isRedactionSuppressed(LevelDisplay const& display);
 
 bool isIdInFilterList(int id);
 void setIdInFilterList(int id, bool inList);

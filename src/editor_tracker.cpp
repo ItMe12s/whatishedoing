@@ -23,7 +23,7 @@ namespace {
         }
         auto const display =
             resolveLevelDisplay(session.levelID, session.levelName, session.creatorName);
-        if (display.redacted && Mod::get()->getSettingValue<bool>("suppress-redacted")) {
+        if (isRedactionSuppressed(display)) {
             session.reset();
             return;
         }
@@ -31,20 +31,13 @@ namespace {
         auto const elapsed = text_policy::formatDuration(
             static_cast<int>(session.timer.elapsed<std::chrono::seconds>())
         );
-        std::vector<WebhookField> fields = {
-            {"Level", display.levelName, true},
-            {"Creator", display.creatorName, true},
-        };
-        if (display.showLevelID) {
-            fields.push_back({"Level ID", geode::utils::numToString(session.levelID), true});
-        }
         sendWebhookIfEnabled(
             "notify-editor",
             WebhookMessage{
                 .title = actionTitle,
                 .description = fmt::format("{} left the editor.", playerName),
                 .color = embed_color::fromKey("color-editor-exit"),
-                .fields = std::move(fields),
+                .fields = makeLevelFields(display, session.levelID, true),
                 .footer = elapsed,
             }
         );
@@ -72,17 +65,10 @@ class $modify(WebhookLevelEditorLayer, LevelEditorLayer) {
         session.creatorName = displayCreatorName(creatorRaw);
         session.active = true;
         auto const display = resolveLevelDisplay(levelID, nameRaw, creatorRaw);
-        if (display.redacted && Mod::get()->getSettingValue<bool>("suppress-redacted")) {
+        if (isRedactionSuppressed(display)) {
             return true;
         }
         auto const playerName = getPlayerName();
-        std::vector<WebhookField> fields = {
-            {"Level", display.levelName, true},
-            {"Creator", display.creatorName, true},
-        };
-        if (display.showLevelID) {
-            fields.push_back({"Level ID", geode::utils::numToString(levelID), true});
-        }
         sendWebhookIfEnabled(
             "notify-editor",
             WebhookMessage{
@@ -94,7 +80,7 @@ class $modify(WebhookLevelEditorLayer, LevelEditorLayer) {
                     display.creatorName
                 ),
                 .color = embed_color::fromKey("color-editor-open"),
-                .fields = std::move(fields),
+                .fields = makeLevelFields(display, levelID, true),
             }
         );
         return true;
