@@ -8,7 +8,7 @@
 	},
 	"id": "imes.whatishedoing",
 	"name": "What is he doing? (Discord Webhook)",
-	"version": "v1.6.1",
+	"version": "v1.6.2",
 	"developer": "imes",
 	"description": "Log your GD activities to a Discord webhook.",
 	"dependencies": {
