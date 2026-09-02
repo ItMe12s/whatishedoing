@@ -31,6 +31,9 @@ struct LevelSession {
     int startPercent = 0;
     int bestNotifiedPercent = 0;
     bool deathNotified = false;
+    int difficulty = -1;
+    int demonDifficulty = 0;
+    int stars = 0;
 
     int64_t elapsedMilliseconds() const;
     std::string startTitle() const;
@@ -54,6 +57,7 @@ LevelSession& levelSession();
 EditorSession& editorSession();
 
 std::string getPlayerName();
+std::string getDifficultyEmoji(int difficulty, int demonDifficulty, int stars);
 std::string displayLevelName(std::string const& levelName);
 std::string displayCreatorName(std::string const& creatorName);
 

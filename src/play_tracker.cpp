@@ -144,12 +144,17 @@ class $modify(WebhookPlayLayer, PlayLayer) {
         play_events::syncPlayMode(this);
         session.startPercent = static_cast<int>(level->m_normalPercent.value());
         session.bestNotifiedPercent = static_cast<int>(level->m_newNormalPercent2.value());
+        session.difficulty = static_cast<int>(level->m_difficulty);
+        session.demonDifficulty = level->m_demonDifficulty;
+        session.stars = static_cast<int>(level->m_stars.value());
         if (play_policy::shouldCaptureStartposSegment(session.mode)) {
             play_events::queueStartposSegmentStart(this);
         }
         auto const playerName = getPlayerName();
         if (!isContinuation) {
             auto const display = resolveLevelDisplay(levelID, levelName, creatorName);
+            auto emoji =
+                getDifficultyEmoji(session.difficulty, session.demonDifficulty, session.stars);
             if (isRedactionSuppressed(display)) {
                 return true;
             }
@@ -158,8 +163,9 @@ class $modify(WebhookPlayLayer, PlayLayer) {
                 WebhookMessage{
                     .title = session.startTitle(),
                     .description = fmt::format(
-                                       "**{}** is now playing **{}** by **{}**.",
+                                       "**{}** is now playing {} **{}** by **{}**.",
                                        playerName,
+                                       emoji,
                                        display.levelName,
                                        display.creatorName
                                    ) +
@@ -226,6 +232,7 @@ class $modify(WebhookPlayLayer, PlayLayer) {
         std::string const sessionLevelName = pre.levelName;
         auto const sessionAttemptStart = pre.attemptTimer.time();
         std::string const completeTitleSnapshot = pre.completeTitle();
+        auto emoji = getDifficultyEmoji(pre.difficulty, pre.demonDifficulty, pre.stars);
         PlayLayer::levelComplete();
         auto const screenshotEpoch = ++m_fields->screenshotEpoch;
         auto const captureStillValid = [this, screenshotEpoch] {
@@ -260,11 +267,11 @@ class $modify(WebhookPlayLayer, PlayLayer) {
                                 WebhookMessage{
                                     .title = "Startpos Complete!",
                                     .description = fmt::format(
-                                        "**{}** got a **{}-{}%** run on "
-                                        "**{}** by **{}**.",
+                                        "**{}** got a **{}-{}%** run on {} **{}** by **{}**.",
                                         playerName,
                                         startPercent,
                                         100,
+                                        emoji,
                                         display.levelName,
                                         display.creatorName
                                     ),
@@ -296,8 +303,9 @@ class $modify(WebhookPlayLayer, PlayLayer) {
                         WebhookMessage{
                             .title = completeTitleSnapshot,
                             .description = fmt::format(
-                                "**{}** beat **{}** by **{}**!",
+                                "**{}** beat {} **{}** by **{}**!",
                                 playerName,
+                                emoji,
                                 display.levelName,
                                 display.creatorName
                             ),
@@ -392,6 +400,7 @@ class $modify(WebhookPlayLayer, PlayLayer) {
 class $modify(WebhookEndLevelLayer, EndLevelLayer) {
     void onMenu(CCObject* sender) {
         play_events::sendCompletedLevelExitIfQueued(m_playLayer);
+        play_events::consumeSentCompletedLevelExit(m_playLayer);
         EndLevelLayer::onMenu(sender);
     }
 

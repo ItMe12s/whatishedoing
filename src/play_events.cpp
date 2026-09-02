@@ -56,14 +56,19 @@ namespace play_events {
         RunMode mode, LevelDisplay const& display, int levelID, std::string const& playerName,
         std::string footer
     ) {
+        auto const& session = levelSession();
+        auto emoji = getDifficultyEmoji(session.difficulty, session.demonDifficulty, session.stars);
         sendWebhookIfEnabled(
             "notify-play-level",
             WebhookMessage{
                 .title = mode == RunMode::Practice ? "Exited a Practice Run" : "Exited a Level",
-                .description =
-                    fmt::format(
-                        "**{}** exited **{}** by **{}**.", playerName, display.levelName, display.creatorName
-                    ) +
+                .description = fmt::format(
+                                   "**{}** exited {} **{}** by **{}**.",
+                                   playerName,
+                                   emoji,
+                                   display.levelName,
+                                   display.creatorName
+                               ) +
                     levelIdLine(display, levelID),
                 .color = mode == RunMode::Practice ? embed_color::fromKey("color-play-practice") :
                                                      embed_color::fromKey("color-level-exit"),
@@ -122,6 +127,9 @@ namespace play_events {
         session.active = true;
         session.startPercent = static_cast<int>(level->m_normalPercent.value());
         session.bestNotifiedPercent = static_cast<int>(level->m_newNormalPercent2.value());
+        session.difficulty = static_cast<int>(level->m_difficulty);
+        session.demonDifficulty = level->m_demonDifficulty;
+        session.stars = static_cast<int>(level->m_stars.value());
         syncPlayMode(layer);
         if (play_policy::shouldCaptureStartposSegment(session.mode)) {
             queueStartposSegmentStart(layer);
@@ -173,21 +181,25 @@ namespace play_events {
         auto const sessionAttemptStart = session.attemptTimer.time();
         session.deathNotified = true;
         auto sendDeath = [=](std::optional<std::vector<std::uint8_t>> screenshot) {
+            auto emoji =
+                getDifficultyEmoji(session.difficulty, session.demonDifficulty, session.stars);
             WebhookMessage message{
                 .title = "Died",
                 .description = fromStartpos ?
                     fmt::format(
-                        "**{}** got a **{}-{}%** run on **{}** by **{}**.",
+                        "**{}** got a **{}-{}%** run on {} **{}** by **{}**.",
                         playerName,
                         deathStartPercent,
                         currentPercent,
+                        emoji,
                         display.levelName,
                         display.creatorName
                     ) :
                     fmt::format(
-                        "**{}** died at **{}%** on **{}** by **{}**.",
+                        "**{}** died at **{}%** on {} **{}** by **{}**.",
                         playerName,
                         currentPercent,
+                        emoji,
                         display.levelName,
                         display.creatorName
                     ),
@@ -252,13 +264,16 @@ namespace play_events {
         std::string const sessionLevelName = session.levelName;
         auto const sessionAttemptStart = session.attemptTimer.time();
         auto sendNewBest = [=](std::optional<std::vector<std::uint8_t>> screenshot) {
+            auto emoji =
+                getDifficultyEmoji(session.difficulty, session.demonDifficulty, session.stars);
             sendWebhook(
                 WebhookMessage{
                     .title = "New Best!",
                     .description = fmt::format(
-                        "**{}** reached a new best of **{}%** on **{}** by **{}**.",
+                        "**{}** reached a new best of **{}%** on {} **{}** by **{}**.",
                         playerName,
                         effectiveBest,
+                        emoji,
                         display.levelName,
                         display.creatorName
                     ),

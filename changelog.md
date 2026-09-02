@@ -2,6 +2,10 @@
 
 Currently no announcements for this mod.
 
+## 1.6.1
+
+- Added difficulty face emojis
+
 ## 1.6.0
 
 - More compact message format
