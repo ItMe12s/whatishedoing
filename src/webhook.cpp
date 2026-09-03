@@ -13,6 +13,7 @@
 #include <asp/time/SystemTime.hpp>
 #include <chrono>
 #include <cstdint>
+#include <filesystem>
 #include <matjson.hpp>
 #include <memory>
 #include <optional>
@@ -114,15 +115,15 @@ namespace webhook_impl {
     }
 
     std::vector<std::string> collectWebhookTargets() {
-        static constexpr char const* kWebhookKeys[] = {
+        static constexpr auto kWebhookKeys = std::to_array<std::string_view>({
             "webhook-url",
             "extra-webhook-url-1",
             "extra-webhook-url-2",
             "extra-webhook-url-3",
             "extra-webhook-url-4",
-        };
+        });
         std::vector<std::string> out;
-        for (auto* key : kWebhookKeys) {
+        for (auto key : kWebhookKeys) {
             if (auto u = normalizeWebhookUrl(Mod::get()->getSettingValue<std::string>(key))) {
                 out.push_back(std::move(*u));
             }
@@ -163,7 +164,8 @@ namespace webhook_impl {
 
     Result<matjson::Value> buildWebhookPayload(
         std::string const& title, std::string const& description, int color,
-        std::string const& footer, bool embedScreenshotAttachment
+        std::string const& footer, std::optional<std::string> const& faceFilename,
+        bool embedScreenshotAttachment
     ) {
         GEODE_UNWRAP_INTO(
             auto titleClamped,
@@ -185,6 +187,9 @@ namespace webhook_impl {
         embed["timestamp"] = currentIso8601Utc();
         if (!footerClamped.empty()) {
             auto footerObj = matjson::Value::object();
+            if (faceFilename) {
+                footerObj["icon_url"] = fmt::format("attachment://{}", *faceFilename);
+            }
             footerObj["text"] = std::move(footerClamped);
             embed["footer"] = footerObj;
         }
@@ -283,9 +288,27 @@ namespace webhook_impl {
         if (urls.empty()) {
             return;
         }
-        bool const hasShot = message.screenshotPng.has_value() && !message.screenshotPng->empty();
+        std::optional<std::string> faceFilename;
+        std::optional<std::vector<std::uint8_t>> faceBytes;
+        // Footer icon needs non-empty footer text to render, skip face when no footer
+        if (message.difficultyFace && !message.difficultyFace->empty() && !message.footer.empty()) {
+            auto const facePath = Mod::get()->getResourcesDir() / (*message.difficultyFace + ".png");
+            if (auto read = geode::utils::file::readBinary(facePath);
+                read.isOk() && !read.unwrap().empty()) {
+                faceBytes = read.unwrap();
+                faceFilename = fmt::format("{}.png", *message.difficultyFace);
+            }
+            else {
+                log::warn("Failed to read difficulty face {}", facePath.string());
+            }
+        }
+        bool const hasShot = message.screenshotPng
+                                 .transform([](auto const& png) {
+                                     return !png.empty();
+                                 })
+                                 .value_or(false);
         auto payloadResult = buildWebhookPayload(
-            message.title, message.description, message.color, message.footer, hasShot
+            message.title, message.description, message.color, message.footer, faceFilename, hasShot
         );
         if (payloadResult.isErr()) {
             return;
@@ -294,29 +317,68 @@ namespace webhook_impl {
         int const maxRetries = maxRetriesSetting();
         int const effectiveMaxRetries = useSync ? std::min(maxRetries, kSyncMaxRetries) : maxRetries;
 
-        if (hasShot) {
+        if (faceBytes || hasShot) {
             auto payloadJson = payload.dump(matjson::NO_INDENTATION);
             if (useSync) {
-                auto const& bytes = *message.screenshotPng;
                 for (auto const& url : urls) {
                     postSyncWithRetries(url, effectiveMaxRetries, [&](web::WebRequest& req) {
                         web::MultipartForm form;
                         form.param("payload_json", payloadJson);
-                        form.file("files[0]", bytes, "screenshot.png", "image/png");
+                        int fileIndex = 0;
+                        if (faceBytes) {
+                            form.file(
+                                fmt::format("files[{}]", fileIndex++),
+                                *faceBytes,
+                                *faceFilename,
+                                "image/png"
+                            );
+                        }
+                        if (hasShot) {
+                            form.file(
+                                fmt::format("files[{}]", fileIndex++),
+                                *message.screenshotPng,
+                                "screenshot.png",
+                                "image/png"
+                            );
+                        }
                         req.bodyMultipart(std::move(form));
                     });
                 }
             }
             else {
-                auto sharedBytes = std::make_shared<std::vector<std::uint8_t> const>(
-                    std::move(*message.screenshotPng)
-                );
+                auto sharedFace = faceBytes ?
+                    std::make_shared<std::vector<std::uint8_t> const>(std::move(*faceBytes)) :
+                    nullptr;
+                auto sharedShot = hasShot ? std::make_shared<std::vector<std::uint8_t> const>(
+                                                std::move(*message.screenshotPng)
+                                            ) :
+                                            nullptr;
                 for (auto const& url : urls) {
                     async::spawn(postAsyncWithRetries(
-                        url, effectiveMaxRetries, [payloadJson, sharedBytes](web::WebRequest& req) {
+                        url,
+                        effectiveMaxRetries,
+                        [payloadJson, sharedFace, sharedShot, faceFilename, hasShot](
+                            web::WebRequest& req
+                        ) {
                             web::MultipartForm form;
                             form.param("payload_json", payloadJson);
-                            form.file("files[0]", *sharedBytes, "screenshot.png", "image/png");
+                            int fileIndex = 0;
+                            if (sharedFace) {
+                                form.file(
+                                    fmt::format("files[{}]", fileIndex++),
+                                    *sharedFace,
+                                    *faceFilename,
+                                    "image/png"
+                                );
+                            }
+                            if (hasShot) {
+                                form.file(
+                                    fmt::format("files[{}]", fileIndex++),
+                                    *sharedShot,
+                                    "screenshot.png",
+                                    "image/png"
+                                );
+                            }
                             req.bodyMultipart(std::move(form));
                         }
                     ));

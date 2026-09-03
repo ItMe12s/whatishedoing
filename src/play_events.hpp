@@ -31,7 +31,7 @@ namespace play_events {
     );
     void sendLevelExitWebhook(
         RunMode mode, LevelDisplay const& display, int levelID, std::string const& playerName,
-        std::string footer
+        std::string elapsed, std::optional<std::string> faceOverride = std::nullopt
     );
     void clearCompletedLevelExit(PlayLayer* layer);
     void queueCompletedLevelExit(PlayLayer* layer, std::int64_t elapsedMilliseconds);

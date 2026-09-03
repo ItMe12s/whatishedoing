@@ -1,3 +1,4 @@
+#include "difficulty_face.hpp"
 #include "embed_colors.hpp"
 #include "play_events.hpp"
 #include "screenshot.hpp"
@@ -147,14 +148,16 @@ class $modify(WebhookPlayLayer, PlayLayer) {
         session.difficulty = static_cast<int>(level->m_difficulty);
         session.demonDifficulty = level->m_demonDifficulty;
         session.stars = static_cast<int>(level->m_stars.value());
+        session.rating = getLevelRating(level);
         if (play_policy::shouldCaptureStartposSegment(session.mode)) {
             play_events::queueStartposSegmentStart(this);
         }
         auto const playerName = getPlayerName();
         if (!isContinuation) {
             auto const display = resolveLevelDisplay(levelID, levelName, creatorName);
-            auto emoji =
-                getDifficultyEmoji(session.difficulty, session.demonDifficulty, session.stars);
+            auto face = getDifficultyFace(
+                session.difficulty, session.demonDifficulty, session.stars, session.rating
+            );
             if (isRedactionSuppressed(display)) {
                 return true;
             }
@@ -163,14 +166,14 @@ class $modify(WebhookPlayLayer, PlayLayer) {
                 WebhookMessage{
                     .title = session.startTitle(),
                     .description = fmt::format(
-                                       "**{}** is now playing {} **{}** by **{}**.",
-                                       playerName,
-                                       emoji,
-                                       display.levelName,
-                                       display.creatorName
-                                   ) +
-                        levelIdLine(display, levelID),
+                        "**{}** is now playing **{}** by **{}**.",
+                        playerName,
+                        display.levelName,
+                        display.creatorName
+                    ),
                     .color = session.color(),
+                    .footer = footerWithLevelId("", display.showLevelID, levelID),
+                    .difficultyFace = std::move(face),
                 }
             );
         }
@@ -232,7 +235,7 @@ class $modify(WebhookPlayLayer, PlayLayer) {
         std::string const sessionLevelName = pre.levelName;
         auto const sessionAttemptStart = pre.attemptTimer.time();
         std::string const completeTitleSnapshot = pre.completeTitle();
-        auto emoji = getDifficultyEmoji(pre.difficulty, pre.demonDifficulty, pre.stars);
+        auto face = getDifficultyFace(pre.difficulty, pre.demonDifficulty, pre.stars, pre.rating);
         PlayLayer::levelComplete();
         auto const screenshotEpoch = ++m_fields->screenshotEpoch;
         auto const captureStillValid = [this, screenshotEpoch] {
@@ -267,16 +270,17 @@ class $modify(WebhookPlayLayer, PlayLayer) {
                                 WebhookMessage{
                                     .title = "Startpos Complete!",
                                     .description = fmt::format(
-                                        "**{}** got a **{}-{}%** run on {} **{}** by **{}**.",
+                                        "**{}** got a **{}-{}%** run on **{}** by **{}**.",
                                         playerName,
                                         startPercent,
                                         100,
-                                        emoji,
                                         display.levelName,
                                         display.creatorName
                                     ),
                                     .color = completeColor,
-                                    .footer = elapsed,
+                                    .footer =
+                                        footerWithLevelId(elapsed, display.showLevelID, sessionLevelID),
+                                    .difficultyFace = face,
                                     .screenshotPng = std::move(shot),
                                 }
                             );
@@ -303,14 +307,14 @@ class $modify(WebhookPlayLayer, PlayLayer) {
                         WebhookMessage{
                             .title = completeTitleSnapshot,
                             .description = fmt::format(
-                                "**{}** beat {} **{}** by **{}**!",
+                                "**{}** beat **{}** by **{}**!",
                                 playerName,
-                                emoji,
                                 display.levelName,
                                 display.creatorName
                             ),
                             .color = completeColor,
-                            .footer = elapsed,
+                            .footer = footerWithLevelId(elapsed, display.showLevelID, sessionLevelID),
+                            .difficultyFace = face,
                             .screenshotPng = std::move(shot),
                         }
                     );

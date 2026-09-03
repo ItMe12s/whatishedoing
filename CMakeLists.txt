@@ -45,5 +45,6 @@ if(BUILD_TESTING)
         src/text_policy.cpp
     )
     target_include_directories(policy_tests PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src)
+    target_link_libraries(policy_tests PRIVATE fmt::fmt-header-only)
     add_test(NAME policy_tests COMMAND policy_tests)
 endif()

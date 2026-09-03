@@ -1,9 +1,7 @@
 #include "text_policy.hpp"
 
-#include <algorithm>
-#include <iomanip>
-#include <locale>
-#include <sstream>
+#include <fmt/format.h>
+#include <string>
 #include <vector>
 
 namespace text_policy {
@@ -13,7 +11,7 @@ namespace text_policy {
         int const minutes = (totalSeconds % 3600) / 60;
         int const seconds = totalSeconds % 60;
         auto unit = [](int count, char const* name) {
-            return std::to_string(count) + " " + name + (count == 1 ? "" : "s");
+            return fmt::format("{} {}{}", count, name, count == 1 ? "" : "s");
         };
 
         std::vector<std::string> parts;
@@ -30,9 +28,9 @@ namespace text_policy {
             return parts.front();
         }
         if (parts.size() == 2) {
-            return parts[0] + " and " + parts[1];
+            return fmt::format("{} and {}", parts[0], parts[1]);
         }
-        return parts[0] + ", " + parts[1] + " and " + parts[2];
+        return fmt::format("{}, {} and {}", parts[0], parts[1], parts[2]);
     }
 
     std::string formatDurationMs(std::int64_t totalMilliseconds) {
@@ -41,11 +39,7 @@ namespace text_policy {
             return "0 seconds";
         }
         if (totalMilliseconds < 1000) {
-            std::ostringstream out;
-            out.imbue(std::locale::classic());
-            out << std::fixed << std::setprecision(2)
-                << static_cast<double>(totalMilliseconds) / 1000.0 << " seconds";
-            return out.str();
+            return fmt::format("{:.2f} seconds", static_cast<double>(totalMilliseconds) / 1000.0);
         }
         return formatDuration(static_cast<int>(totalMilliseconds / 1000));
     }

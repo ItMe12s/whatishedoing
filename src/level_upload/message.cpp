@@ -7,6 +7,8 @@
 #include <Geode/utils/general.hpp>
 #include <Geode/utils/string.hpp>
 #include <array>
+#include <string_view>
+#include <utility>
 
 using namespace geode::prelude;
 
@@ -14,8 +16,11 @@ namespace level_upload {
     namespace {
 
         std::string lengthString(int len) {
-            static constexpr std::array kLengths = {"Tiny", "Short", "Medium", "Long", "XL", "Plat"};
-            return len >= 0 && len < static_cast<int>(kLengths.size()) ? kLengths[len] : "Unknown";
+            static constexpr auto kLengths =
+                std::to_array<std::string_view>({"Tiny", "Short", "Medium", "Long", "XL", "Plat"});
+            return std::string(
+                (len >= 0 && std::cmp_less(len, kLengths.size())) ? kLengths[len] : "Unknown"
+            );
         }
 
         std::string processConditionals(std::string text, bool isUpdate) {
@@ -54,15 +59,18 @@ namespace level_upload {
 
         if (mod->getSettingValue<bool>("upload-use-custom-text")) {
             text = readCustomTextFile();
-            geode::utils::string::replaceIP(text, "{creator}", creator);
-            geode::utils::string::replaceIP(text, "{name}", name);
-            geode::utils::string::replaceIP(text, "{id}", id);
-            geode::utils::string::replaceIP(text, "{lengh}", length);
-            geode::utils::string::replaceIP(text, "{length}", length);
-            geode::utils::string::replaceIP(text, "{objects}", objects);
-            geode::utils::string::replaceIP(
-                text, "{role}", wantRolePing ? fmt::format("<@&{}>", roleID) : ""
-            );
+            for (auto [key, value] : std::array{
+                     std::pair<std::string_view, std::string>{"{creator}", creator},
+                     std::pair<std::string_view, std::string>{"{name}", name},
+                     std::pair<std::string_view, std::string>{"{id}", id},
+                     std::pair<std::string_view, std::string>{"{length}", length},
+                     std::pair<std::string_view, std::string>{"{objects}", objects},
+                     std::pair<std::string_view, std::string>{
+                         "{role}", wantRolePing ? fmt::format("<@&{}>", roleID) : ""
+                     },
+                 }) {
+                geode::utils::string::replaceIP(text, key, value);
+            }
             text = processConditionals(text, isUpdate);
         }
         else {

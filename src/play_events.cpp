@@ -1,5 +1,6 @@
 #include "play_events.hpp"
 
+#include "difficulty_face.hpp"
 #include "embed_colors.hpp"
 #include "screenshot.hpp"
 #include "state.hpp"
@@ -29,6 +30,7 @@ namespace play_events {
             RunMode mode = RunMode::Normal;
             std::int64_t elapsedMs = 0;
             Clock::time_point attemptStart;
+            std::optional<std::string> difficultyFace;
         };
 
         std::optional<PendingCompletedLevelExit> s_pendingCompletedLevelExit;
@@ -54,25 +56,25 @@ namespace play_events {
 
     void sendLevelExitWebhook(
         RunMode mode, LevelDisplay const& display, int levelID, std::string const& playerName,
-        std::string footer
+        std::string elapsed, std::optional<std::string> faceOverride
     ) {
         auto const& session = levelSession();
-        auto emoji = getDifficultyEmoji(session.difficulty, session.demonDifficulty, session.stars);
+        auto face = faceOverride ?
+            std::move(faceOverride) :
+            getDifficultyFace(
+                session.difficulty, session.demonDifficulty, session.stars, session.rating
+            );
         sendWebhookIfEnabled(
             "notify-play-level",
             WebhookMessage{
                 .title = mode == RunMode::Practice ? "Exited a Practice Run" : "Exited a Level",
                 .description = fmt::format(
-                                   "**{}** exited {} **{}** by **{}**.",
-                                   playerName,
-                                   emoji,
-                                   display.levelName,
-                                   display.creatorName
-                               ) +
-                    levelIdLine(display, levelID),
+                    "**{}** exited **{}** by **{}**.", playerName, display.levelName, display.creatorName
+                ),
                 .color = mode == RunMode::Practice ? embed_color::fromKey("color-play-practice") :
                                                      embed_color::fromKey("color-level-exit"),
-                .footer = std::move(footer),
+                .footer = footerWithLevelId(elapsed, display.showLevelID, levelID),
+                .difficultyFace = std::move(face),
             }
         );
     }
@@ -130,6 +132,7 @@ namespace play_events {
         session.difficulty = static_cast<int>(level->m_difficulty);
         session.demonDifficulty = level->m_demonDifficulty;
         session.stars = static_cast<int>(level->m_stars.value());
+        session.rating = getLevelRating(level);
         syncPlayMode(layer);
         if (play_policy::shouldCaptureStartposSegment(session.mode)) {
             queueStartposSegmentStart(layer);
@@ -181,29 +184,30 @@ namespace play_events {
         auto const sessionAttemptStart = session.attemptTimer.time();
         session.deathNotified = true;
         auto sendDeath = [=](std::optional<std::vector<std::uint8_t>> screenshot) {
-            auto emoji =
-                getDifficultyEmoji(session.difficulty, session.demonDifficulty, session.stars);
+            auto face = getDifficultyFace(
+                session.difficulty, session.demonDifficulty, session.stars, session.rating
+            );
             WebhookMessage message{
                 .title = "Died",
                 .description = fromStartpos ?
                     fmt::format(
-                        "**{}** got a **{}-{}%** run on {} **{}** by **{}**.",
+                        "**{}** got a **{}-{}%** run on **{}** by **{}**.",
                         playerName,
                         deathStartPercent,
                         currentPercent,
-                        emoji,
                         display.levelName,
                         display.creatorName
                     ) :
                     fmt::format(
-                        "**{}** died at **{}%** on {} **{}** by **{}**.",
+                        "**{}** died at **{}%** on **{}** by **{}**.",
                         playerName,
                         currentPercent,
-                        emoji,
                         display.levelName,
                         display.creatorName
                     ),
                 .color = embed_color::fromKey("color-death"),
+                .footer = footerWithLevelId("", display.showLevelID, sessionLevelID),
+                .difficultyFace = std::move(face),
                 .screenshotPng = std::move(screenshot),
             };
             sendWebhook(std::move(message));
@@ -264,20 +268,22 @@ namespace play_events {
         std::string const sessionLevelName = session.levelName;
         auto const sessionAttemptStart = session.attemptTimer.time();
         auto sendNewBest = [=](std::optional<std::vector<std::uint8_t>> screenshot) {
-            auto emoji =
-                getDifficultyEmoji(session.difficulty, session.demonDifficulty, session.stars);
+            auto face = getDifficultyFace(
+                session.difficulty, session.demonDifficulty, session.stars, session.rating
+            );
             sendWebhook(
                 WebhookMessage{
                     .title = "New Best!",
                     .description = fmt::format(
-                        "**{}** reached a new best of **{}%** on {} **{}** by **{}**.",
+                        "**{}** reached a new best of **{}%** on **{}** by **{}**.",
                         playerName,
                         effectiveBest,
-                        emoji,
                         display.levelName,
                         display.creatorName
                     ),
                     .color = embed_color::fromKey("color-new-best"),
+                    .footer = footerWithLevelId("", display.showLevelID, sessionLevelID),
+                    .difficultyFace = std::move(face),
                     .screenshotPng = std::move(screenshot),
                 }
             );
@@ -315,6 +321,7 @@ namespace play_events {
             session.mode,
             elapsedMilliseconds,
             session.attemptTimer.time(),
+            getDifficultyFace(session.difficulty, session.demonDifficulty, session.stars, session.rating),
         };
     }
 
@@ -339,7 +346,8 @@ namespace play_events {
             display,
             pending.levelID,
             getPlayerName(),
-            text_policy::formatDurationMs(pending.elapsedMs)
+            text_policy::formatDurationMs(pending.elapsedMs),
+            std::move(pending.difficultyFace)
         );
     }
 

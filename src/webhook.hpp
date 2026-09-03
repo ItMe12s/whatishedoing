@@ -10,6 +10,7 @@ struct WebhookMessage {
     std::string description;
     int color = 0;
     std::string footer;
+    std::optional<std::string> difficultyFace;
     std::optional<std::vector<std::uint8_t>> screenshotPng;
 };
 

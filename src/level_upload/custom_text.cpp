@@ -18,7 +18,7 @@ namespace level_upload {
 **{creator} {isUploaded"dropped a new"}{isUpdated"updated a"} level!**
 - Name: {name}
 - ID: {id}
--# {lengh} ({objects} objects)
+-# {length} ({objects} objects)
 ||{role}||)";
 
         std::filesystem::path customTextFilePath() {

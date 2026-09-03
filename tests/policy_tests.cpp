@@ -1,3 +1,4 @@
+#include "difficulty_face.hpp"
 #include "level_filter.hpp"
 #include "play_policy.hpp"
 #include "retry_policy.hpp"
@@ -174,6 +175,47 @@ namespace {
         );
     }
 
+    void testDifficultyFace() {
+        expect(getLevelRating(0, 0, 0) == 0, "unrated");
+        expect(getLevelRating(0, 0, 5) == 1, "rated");
+        expect(getLevelRating(1, 0, 5) == 2, "featured");
+        expect(getLevelRating(0, 1, 10) == 3, "epic");
+        expect(getLevelRating(0, 2, 10) == 4, "legendary");
+        expect(getLevelRating(0, 3, 10) == 5, "mythic");
+        expect(getLevelRating(0, 9, 0) == 0, "unknown isEpic falls back to unrated");
+        expect(getDifficultyFace(-1, 0, 0) == std::optional<std::string>{"unrated"}, "unrated face");
+        expect(
+            getDifficultyFace(0, 0, 5, 2) == std::optional<std::string>{"hard-featured"},
+            "hard featured face"
+        );
+        expect(
+            getDifficultyFace(6, 6, 10, 5) == std::optional<std::string>{"demon-extreme-mythic"},
+            "extreme mythic face"
+        );
+        expect(
+            getDifficultyFace(6, 0, 10, 1) == std::optional<std::string>{"demon-hard"},
+            "plain demon is demon-hard"
+        );
+        expect(
+            getDifficultyFace(0, 0, 1, 3) == std::optional<std::string>{"auto-epic"},
+            "auto epic face"
+        );
+        expect(
+            getDifficultyFace(7, 0, 0, 4) == std::optional<std::string>{"unrated-legendary"},
+            "zero stars falls back to unrated base"
+        );
+        expect(!getDifficultyFace(6, 99, 10, 1), "unknown demon difficulty is no face");
+        expect(!getDifficultyFace(99, 0, 5, 1), "unknown difficulty is no face");
+
+        expect(footerWithLevelId("", true, 123) == "Level ID: 123", "id only footer");
+        expect(footerWithLevelId("", false, 123).empty(), "private footer empty");
+        expect(
+            footerWithLevelId("1 minute", true, 123) == "1 minute \u2022 Level ID: 123",
+            "combined footer"
+        );
+        expect(footerWithLevelId("1 minute", false, 123) == "1 minute", "elapsed only footer");
+    }
+
     void testRetryPolicy() {
         expect(
             retry_policy::delayForFailure(500, std::nullopt, 0, 3) == std::optional<int>{1},
@@ -210,6 +252,7 @@ int main() {
     testNewBestPolicy();
     testLevelFilter();
     testTextPolicy();
+    testDifficultyFace();
     testRetryPolicy();
     if (failures == 0) {
         std::cout << "All policy tests passed\n";

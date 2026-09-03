@@ -4,6 +4,7 @@
 #include <Geode/utils/ranges.hpp>
 #include <Geode/utils/string.hpp>
 #include <cstdint>
+#include <ranges>
 
 using namespace geode::prelude;
 
@@ -158,11 +159,10 @@ namespace profile {
     std::array<std::string, kSlotCount> slotNames() {
         std::array<std::string, kSlotCount> out;
         auto raw = loadNamesRaw();
-        for (std::size_t i = 0; i < kSlotCount; ++i) {
+        for (auto i : std::views::iota(std::size_t{0}, kSlotCount)) {
             std::string name;
             if (raw.isArray() && i < raw.size()) {
-                auto r = raw[i].asString();
-                if (r.isOk()) name = r.unwrap();
+                name = raw[i].asString().unwrapOrDefault();
             }
             if (name.empty()) name = defaultNameFor(i);
             out[i] = std::move(name);
@@ -243,10 +243,9 @@ namespace profile {
 
     std::size_t activeCustomTextSlotIndex() {
         int64_t const raw = Mod::get()->getSavedValue<int64_t>(kActiveCustomTextSlotKey);
-        if (raw < 0 || static_cast<std::size_t>(raw) >= kSlotCount) {
-            return 0;
-        }
-        return static_cast<std::size_t>(raw);
+        return std::in_range<std::size_t>(raw) && static_cast<std::size_t>(raw) < kSlotCount ?
+            static_cast<std::size_t>(raw) :
+            0;
     }
 
     void setActiveCustomTextSlotIndex(std::size_t idx) {

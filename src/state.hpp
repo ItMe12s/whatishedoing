@@ -1,11 +1,13 @@
 #pragma once
 
+#include "difficulty_face.hpp"
 #include "play_policy.hpp"
 #include "webhook.hpp"
 
 #include <chrono>
 #include <cstdint>
 #include <iostream>
+#include <optional>
 #include <string>
 
 #include <Geode/utils/timer.hpp>
@@ -34,6 +36,7 @@ struct LevelSession {
     int difficulty = -1;
     int demonDifficulty = 0;
     int stars = 0;
+    int rating = 0;
 
     int64_t elapsedMilliseconds() const;
     std::string startTitle() const;
@@ -57,7 +60,8 @@ LevelSession& levelSession();
 EditorSession& editorSession();
 
 std::string getPlayerName();
-std::string getDifficultyEmoji(int difficulty, int demonDifficulty, int stars);
+class GJGameLevel;
+int getLevelRating(GJGameLevel* level);
 std::string displayLevelName(std::string const& levelName);
 std::string displayCreatorName(std::string const& creatorName);
 

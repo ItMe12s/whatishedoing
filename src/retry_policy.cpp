@@ -25,14 +25,14 @@ namespace retry_policy {
                 }
                 return 2;
             }
-            return maxDelaySeconds ? std::min(2, *maxDelaySeconds) : 2;
+            return std::min(2, maxDelaySeconds.value_or(2));
         }
 
         int delay = std::numeric_limits<int>::max();
-        if (attempt >= 0 && attempt < std::numeric_limits<unsigned int>::digits - 1) {
+        if (attempt >= 0 && std::cmp_less(attempt, std::numeric_limits<unsigned int>::digits - 1)) {
             delay = 1 << attempt;
         }
-        return maxDelaySeconds ? std::min(delay, *maxDelaySeconds) : delay;
+        return std::min(delay, maxDelaySeconds.value_or(delay));
     }
 
 } // namespace retry_policy

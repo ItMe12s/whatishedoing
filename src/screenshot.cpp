@@ -13,6 +13,8 @@
 #include <cocos2d.h>
 #include <filesystem>
 #include <memory>
+#include <numbers>
+#include <ranges>
 #include <utility>
 #include <vector>
 
@@ -23,7 +25,6 @@ namespace {
 
     float lanczos2(float x) {
         constexpr float radius = 2.f;
-        constexpr float pi = 3.14159265358979323846f; // Not using M_PI today.
         x = std::abs(x);
         if (x == 0) {
             return 1.f;
@@ -31,7 +32,7 @@ namespace {
         if (x >= radius) {
             return 0.f;
         }
-        float const pix = pi * x;
+        float const pix = std::numbers::pi_v<float> * x;
         return radius * std::sin(pix) * std::sin(pix / radius) / (pix * pix);
     }
 
@@ -65,7 +66,7 @@ namespace {
     }
 
     GLubyte toByte(float value) {
-        return static_cast<GLubyte>(std::clamp(static_cast<int>(std::lround(value)), 0, 255));
+        return static_cast<GLubyte>(std::clamp(std::lround(value), 0L, 255L));
     }
 
     std::vector<GLubyte> downscaleRgbaLanczos(GLubyte const* src, int sw, int sh, int dw, int dh) {
@@ -168,14 +169,10 @@ namespace {
 
         auto readResult = geode::utils::file::readBinary(tmp);
         std::filesystem::remove(tmp, ec);
-        if (!readResult.isOk()) {
-            return std::nullopt;
+        if (auto out = readResult.unwrapOrDefault(); !out.empty()) {
+            return out;
         }
-        auto out = readResult.unwrap();
-        if (out.empty()) {
-            return std::nullopt;
-        }
-        return out;
+        return std::nullopt;
     }
 
 } // namespace
@@ -256,9 +253,9 @@ namespace {
         director->setViewport();
 
         auto const rowBytes = static_cast<size_t>(pixelWidth) * 4;
-        for (int i = 0; i < pixelHeight / 2; ++i) {
-            auto* top = cap.rgba.data() + static_cast<size_t>(i) * rowBytes;
-            auto* bottom = cap.rgba.data() + static_cast<size_t>(pixelHeight - i - 1) * rowBytes;
+        for (auto row : std::views::iota(0, pixelHeight / 2)) {
+            auto* top = cap.rgba.data() + static_cast<size_t>(row) * rowBytes;
+            auto* bottom = cap.rgba.data() + static_cast<size_t>(pixelHeight - row - 1) * rowBytes;
             std::swap_ranges(top, top + rowBytes, bottom);
         }
 
