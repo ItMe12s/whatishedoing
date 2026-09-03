@@ -5,9 +5,9 @@ Currently no announcements for this mod.
 ## 1.7.0
 
 - Added rating tiers to difficulty face
-- Move difficulty face to webhook footer icon
+- Moved difficulty face to webhook footer icon
 - Remove legacy level upload custom message `{lengh}` typo
-- Better code frfr
+- Internal improvements
 
 ## 1.6.1
 
