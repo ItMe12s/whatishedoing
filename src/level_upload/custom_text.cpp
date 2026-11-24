@@ -4,8 +4,6 @@
 
 #include <Geode/Geode.hpp>
 #include <Geode/utils/file.hpp>
-#include <filesystem>
-#include <system_error>
 
 using namespace geode::prelude;
 
@@ -21,19 +19,15 @@ namespace level_upload {
 -# {length} ({objects} objects)
 ||{role}||)";
 
-        std::filesystem::path customTextFilePath() {
+        asp::fs::Path customTextFilePath() {
             auto const n = profile::activeCustomTextSlotIndex() + 1;
             return Mod::get()->getConfigDir() / fmt::format("customtextprofile{}.txt", n);
         }
 
         Result<> ensureDefaultCustomTextFile() {
             auto const path = customTextFilePath();
-            std::error_code ec;
-            if (std::filesystem::exists(path, ec)) {
+            if (path.exists()) {
                 return Ok();
-            }
-            if (ec) {
-                return Err("Could not inspect custom text file: {}", ec.message());
             }
             return file::writeStringSafe(path, kDefaultTemplate);
         }

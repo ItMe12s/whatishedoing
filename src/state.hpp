@@ -4,13 +4,12 @@
 #include "play_policy.hpp"
 #include "webhook.hpp"
 
+#include <asp/time/Instant.hpp>
 #include <chrono>
 #include <cstdint>
 #include <iostream>
 #include <optional>
 #include <string>
-
-#include <Geode/utils/timer.hpp>
 
 using Clock = std::chrono::steady_clock;
 using Milliseconds = std::chrono::milliseconds;
@@ -18,12 +17,12 @@ using Milliseconds = std::chrono::milliseconds;
 inline constexpr int kLevelSessionClearedId = -67;
 
 struct GameSession {
-    geode::utils::Timer<Clock> timer;
+    asp::Instant startedAt = asp::Instant::now();
     bool started = false;
 };
 
 struct LevelSession {
-    geode::utils::Timer<Clock> attemptTimer;
+    asp::Instant attemptStartedAt = asp::Instant::now();
     Milliseconds accumulated{};
     int levelID = kLevelSessionClearedId;
     std::string levelName;
@@ -46,7 +45,7 @@ struct LevelSession {
 };
 
 struct EditorSession {
-    geode::utils::Timer<Clock> timer;
+    asp::Instant startedAt = asp::Instant::now();
     int levelID = kLevelSessionClearedId;
     std::string levelName;
     std::string creatorName;

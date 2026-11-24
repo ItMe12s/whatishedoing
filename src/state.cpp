@@ -30,7 +30,7 @@ namespace {
 } // namespace
 
 int64_t LevelSession::elapsedMilliseconds() const {
-    return accumulated.count() + (active ? attemptTimer.elapsed<Milliseconds>() : 0);
+    return accumulated.count() + (active ? attemptStartedAt.elapsed().millis<int64_t>() : 0);
 }
 
 std::string LevelSession::startTitle() const {

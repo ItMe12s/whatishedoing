@@ -14,7 +14,7 @@
 #include <Geode/modify/PlayLayer.hpp>
 #include <cmath>
 #include <cstdint>
-#include <cvolton.level-id-api/include/EditorIDs.hpp>
+#include <cvolton.level-id-api/EditorIDs.hpp>
 #include <deque>
 #include <optional>
 #include <string>
@@ -115,14 +115,14 @@ class $modify(WebhookPlayLayer, PlayLayer) {
         }
     }
 
-    bool init(GJGameLevel* level, bool useReplay, bool dontCreateObjects) {
+    bool init(GJGameLevel* level, bool dontCreateObjects) {
         play_events::clearCompletedLevelExit(nullptr);
         auto& session = levelSession();
         std::string const levelName = level ? std::string(level->m_levelName) : "";
         int const levelID = level ? EditorIDs::getID(level) : kLevelSessionClearedId;
         bool const isContinuation =
             level && session.active && session.levelID == levelID && session.levelName == levelName;
-        if (!PlayLayer::init(level, useReplay, dontCreateObjects)) {
+        if (!PlayLayer::init(level, dontCreateObjects)) {
             return false;
         }
         if (!level) {
@@ -132,13 +132,13 @@ class $modify(WebhookPlayLayer, PlayLayer) {
         auto const creatorName = std::string(level->m_creatorName);
         auto const creatorDisplayName = displayCreatorName(creatorName);
         if (isContinuation) {
-            session.accumulated += Milliseconds(session.attemptTimer.elapsed<Milliseconds>());
+            session.accumulated += Milliseconds(session.attemptStartedAt.elapsed().millis<int64_t>());
         }
         else {
             session.accumulated = Milliseconds::zero();
             session.levelID = levelID;
         }
-        session.attemptTimer.reset();
+        session.attemptStartedAt = asp::Instant::now();
         session.levelName = levelName;
         session.creatorName = creatorDisplayName;
         session.active = true;
@@ -233,7 +233,7 @@ class $modify(WebhookPlayLayer, PlayLayer) {
         int const completeStartPercentSnapshot = pre.startPercent;
         int const sessionLevelID = pre.levelID;
         std::string const sessionLevelName = pre.levelName;
-        auto const sessionAttemptStart = pre.attemptTimer.time();
+        auto const sessionAttemptStart = pre.attemptStartedAt;
         std::string const completeTitleSnapshot = pre.completeTitle();
         auto face = getDifficultyFace(pre.difficulty, pre.demonDifficulty, pre.stars, pre.rating);
         PlayLayer::levelComplete();

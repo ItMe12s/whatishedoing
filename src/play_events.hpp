@@ -13,9 +13,7 @@ class PlayLayer;
 namespace play_events {
 
     void syncPlayMode(PlayLayer* layer);
-    bool matchesLevelSession(
-        int levelID, std::string const& levelName, std::chrono::steady_clock::time_point attemptStart
-    );
+    bool matchesLevelSession(int levelID, std::string const& levelName, asp::Instant attemptStart);
     void queueStartposSegmentStart(PlayLayer* layer);
     void reopenLevelSessionIfNeeded(PlayLayer* layer);
     void sendWithOptionalScreenshot(

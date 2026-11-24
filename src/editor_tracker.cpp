@@ -8,7 +8,7 @@
 #include <Geode/modify/EditorPauseLayer.hpp>
 #include <Geode/modify/LevelEditorLayer.hpp>
 #include <Geode/utils/general.hpp>
-#include <cvolton.level-id-api/include/EditorIDs.hpp>
+#include <cvolton.level-id-api/EditorIDs.hpp>
 #include <utility>
 
 using namespace geode::prelude;
@@ -27,9 +27,7 @@ namespace {
             return;
         }
         auto const playerName = getPlayerName();
-        auto const elapsed = text_policy::formatDuration(
-            static_cast<int>(session.timer.elapsed<std::chrono::seconds>())
-        );
+        auto const elapsed = text_policy::formatDuration(session.startedAt.elapsed().seconds<int>());
         sendWebhookIfEnabled(
             "notify-editor",
             WebhookMessage{
@@ -55,7 +53,7 @@ class $modify(WebhookLevelEditorLayer, LevelEditorLayer) {
         }
         levelSession().reset();
         auto& session = editorSession();
-        session.timer.reset();
+        session.startedAt = asp::Instant::now();
         auto const levelID = EditorIDs::getID(level);
         auto const nameRaw = std::string(level->m_levelName);
         auto const creatorRaw = std::string(level->m_creatorName);

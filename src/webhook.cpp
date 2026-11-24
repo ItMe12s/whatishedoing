@@ -26,8 +26,8 @@ using namespace geode::prelude;
 
 namespace webhook_impl {
 
-    constexpr auto kAsyncRequestTimeout = std::chrono::seconds(10);
-    constexpr auto kSyncRequestTimeout = std::chrono::seconds(3);
+    constexpr auto kAsyncRequestTimeout = asp::Duration::fromSecs(10);
+    constexpr auto kSyncRequestTimeout = asp::Duration::fromSecs(3);
     constexpr int kSyncMaxRetries = 1;
     constexpr int kSyncMaxRetryDelaySeconds = 2;
 

@@ -19,7 +19,7 @@ $execute {
                 return;
             }
             session.started = true;
-            session.timer.reset();
+            session.startedAt = asp::Instant::now();
             auto const playerName = getPlayerName();
             sendWebhookIfEnabled(
                 "notify-game-session",
@@ -42,9 +42,8 @@ $execute {
                 return;
             }
             auto const playerName = getPlayerName();
-            auto const elapsed = text_policy::formatDuration(
-                static_cast<int>(session.timer.elapsed<std::chrono::seconds>())
-            );
+            auto const elapsed =
+                text_policy::formatDuration(session.startedAt.elapsed().seconds<int>());
             WebhookMessage message{
                 .title = "Closed Geometry Dash",
                 .description = fmt::format("**{}** closed Geometry Dash.", playerName),

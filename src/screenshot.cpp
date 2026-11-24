@@ -7,11 +7,10 @@
 #include <Geode/utils/file.hpp>
 #include <Geode/utils/general.hpp>
 #include <Geode/utils/random.hpp>
-#include <Geode/utils/string.hpp>
 #include <algorithm>
+#include <asp/fs/fs.hpp>
 #include <cmath>
 #include <cocos2d.h>
-#include <filesystem>
 #include <memory>
 #include <numbers>
 #include <ranges>
@@ -126,7 +125,7 @@ namespace {
 
     ScreenshotPng encodeRgbaToPngBytes(
         std::vector<std::uint8_t> flippedRgba, int pixelWidth, int pixelHeight, int pct,
-        std::filesystem::path const& tmp
+        asp::fs::Path const& tmp
     ) {
         if (pixelWidth <= 0 || pixelHeight <= 0 || flippedRgba.empty()) {
             return std::nullopt;
@@ -158,17 +157,15 @@ namespace {
         image.m_bPreMulti = false;
         image.m_pData = encodePixels;
 
-        auto const tmpString = geode::utils::string::pathToString(tmp);
-        bool const saved = image.saveToFile(tmpString.c_str(), true);
+        bool const saved = image.saveToFile(tmp.string().c_str(), true);
         image.m_pData = nullptr;
-        std::error_code ec;
         if (!saved) {
-            std::filesystem::remove(tmp, ec);
+            (void)asp::fs::removeFile(tmp);
             return std::nullopt;
         }
 
         auto readResult = geode::utils::file::readBinary(tmp);
-        std::filesystem::remove(tmp, ec);
+        (void)asp::fs::removeFile(tmp);
         if (auto out = readResult.unwrapOrDefault(); !out.empty()) {
             return out;
         }

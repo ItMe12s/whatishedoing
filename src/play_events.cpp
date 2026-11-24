@@ -11,7 +11,7 @@
 #include <Geode/binding/GJGameLevel.hpp>
 #include <Geode/binding/PlayLayer.hpp>
 #include <cstdint>
-#include <cvolton.level-id-api/include/EditorIDs.hpp>
+#include <cvolton.level-id-api/EditorIDs.hpp>
 #include <optional>
 #include <string>
 #include <utility>
@@ -29,7 +29,7 @@ namespace play_events {
             std::string creatorName;
             RunMode mode = RunMode::Normal;
             std::int64_t elapsedMs = 0;
-            Clock::time_point attemptStart;
+            asp::Instant attemptStart;
             std::optional<std::string> difficultyFace;
         };
 
@@ -79,10 +79,10 @@ namespace play_events {
         );
     }
 
-    bool matchesLevelSession(int levelID, std::string const& levelName, Clock::time_point attemptStart) {
+    bool matchesLevelSession(int levelID, std::string const& levelName, asp::Instant attemptStart) {
         auto const& session = levelSession();
         return session.active && session.levelID == levelID && session.levelName == levelName &&
-            session.attemptTimer.time() == attemptStart;
+            session.attemptStartedAt == attemptStart;
     }
 
     void queueStartposSegmentStart(PlayLayer* layer) {
@@ -94,7 +94,7 @@ namespace play_events {
         }
         auto const levelID = EditorIDs::getID(layer->m_level);
         std::string const levelName = std::string(layer->m_level->m_levelName);
-        auto const attemptStart = levelSession().attemptTimer.time();
+        auto const attemptStart = levelSession().attemptStartedAt;
         int const startPercent = static_cast<int>(layer->getCurrentPercent());
         geode::queueInMainThread(
             [layer = WeakRef(layer), levelID, levelName, attemptStart, startPercent] {
@@ -125,7 +125,7 @@ namespace play_events {
         session.levelName = std::string(level->m_levelName);
         session.creatorName = displayCreatorName(std::string(level->m_creatorName));
         session.accumulated = Milliseconds::zero();
-        session.attemptTimer.reset();
+        session.attemptStartedAt = asp::Instant::now();
         session.active = true;
         session.startPercent = static_cast<int>(level->m_normalPercent.value());
         session.bestNotifiedPercent = static_cast<int>(level->m_newNormalPercent2.value());
@@ -181,7 +181,7 @@ namespace play_events {
         int const deathStartPercent = session.startPercent;
         int const sessionLevelID = session.levelID;
         std::string const sessionLevelName = session.levelName;
-        auto const sessionAttemptStart = session.attemptTimer.time();
+        auto const sessionAttemptStart = session.attemptStartedAt;
         session.deathNotified = true;
         auto sendDeath = [=](std::optional<std::vector<std::uint8_t>> screenshot) {
             auto face = getDifficultyFace(
@@ -266,7 +266,7 @@ namespace play_events {
         session.bestNotifiedPercent = effectiveBest;
         int const sessionLevelID = session.levelID;
         std::string const sessionLevelName = session.levelName;
-        auto const sessionAttemptStart = session.attemptTimer.time();
+        auto const sessionAttemptStart = session.attemptStartedAt;
         auto sendNewBest = [=](std::optional<std::vector<std::uint8_t>> screenshot) {
             auto face = getDifficultyFace(
                 session.difficulty, session.demonDifficulty, session.stars, session.rating
@@ -320,7 +320,7 @@ namespace play_events {
             session.creatorName,
             session.mode,
             elapsedMilliseconds,
-            session.attemptTimer.time(),
+            session.attemptStartedAt,
             getDifficultyFace(session.difficulty, session.demonDifficulty, session.stars, session.rating),
         };
     }
