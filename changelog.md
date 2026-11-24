@@ -2,6 +2,12 @@
 
 Currently no announcements for this mod.
 
+## 1.7.1
+
+- Updated to Geode 6.0.0-beta.3
+- Updated to Node IDs 1.24.0-beta.1
+- Updated to Editor Level ID API 2.1.0
+
 ## 1.7.0
 
 - Added rating tiers to difficulty face
